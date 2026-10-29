@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>銀風巡弋 提示機與除錯台</title>
+<style>
+  :root { --bg1:#0b1530; --bg2:#14315f; --glass:rgba(255,255,255,.08); --line:rgba(255,255,255,.18); --fg:#f2f6ff; --dim:#9fb3d6; --ok:#38d39f; --warn:#ffc857; --bad:#ff6b6b; --gold:#ffd166; --accent:#5aa8ff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
+  body { color:var(--fg); font-family:"Microsoft JhengHei","PingFang TC",system-ui,sans-serif; background:radial-gradient(1200px 800px at 20% 10%, var(--bg2), var(--bg1)); overflow:hidden; }
+  body.elder { user-select:none; }
+  #app { height:100%; display:flex; flex-direction:column; padding:max(14px, env(safe-area-inset-top)) 28px 20px; }
+  button { font:inherit; color:var(--fg); cursor:pointer; }
+
+  /* 上方列 */
+  .top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .logo { font-size:28px; font-weight:800; letter-spacing:.08em; }
+  .logo small { display:block; font-size:14px; font-weight:400; color:var(--dim); letter-spacing:.12em; }
+  .grow { flex:1; }
+  .chip { display:flex; align-items:center; gap:10px; padding:8px 16px; border-radius:999px; background:var(--glass); border:1px solid var(--line); font-size:18px; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--bad); box-shadow:0 0 10px var(--bad); }
+  .dot.on { background:var(--ok); box-shadow:0 0 12px var(--ok); }
+  .mini { font-size:15px; background:var(--glass); border:1px solid var(--line); border-radius:999px; padding:8px 16px; }
+  .mini:hover { border-color:var(--accent); }
+  .seg { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .seg button { border:none; background:transparent; padding:8px 18px; font-size:15px; }
+  .seg button.on { background:rgba(90,168,255,.35); font-weight:700; }
+
+  /* 提示機（長者模式） */
+  #elder { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; }
+  .view { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:18px; }
+  .view.show { display:flex; animation:fadein .45s ease; }
+  @keyframes fadein { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
+  .radar { position:relative; width:min(46vh, 380px); aspect-ratio:1; border-radius:50%; background:radial-gradient(circle, rgba(56,211,159,.10), rgba(56,211,159,.02) 70%); border:2px solid rgba(56,211,159,.45); box-shadow:0 0 60px rgba(56,211,159,.18) inset, 0 0 40px rgba(56,211,159,.15); }
+  .radar::before, .radar::after { content:""; position:absolute; inset:18%; border-radius:50%; border:1px dashed rgba(56,211,159,.35); }
+  .radar::after { inset:36%; }
+  .sweep { position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, rgba(56,211,159,.55), rgba(56,211,159,0) 28%); animation:spin 3.2s linear infinite; }
+  .radar.idle .sweep { animation:none; opacity:.15; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .car { position:absolute; left:50%; top:50%; width:22%; transform:translate(-50%,-50%); }
+  .state-title { font-size:clamp(34px, 6vh, 56px); font-weight:800; }
+  .state-sub { font-size:clamp(18px, 2.8vh, 26px); color:var(--dim); }
+  .lanes { display:flex; gap:10px; justify-content:center; }
+  .lanes i { width:44px; height:12px; border-radius:6px; background:rgba(255,255,255,.14); }
+  .lanes i.done { background:var(--ok); box-shadow:0 0 10px var(--ok); }
+  .lanes i.now { background:var(--gold); animation:pulse 1s infinite alternate; }
+  @keyframes pulse { from { opacity:.5; } to { opacity:1; } }
+  #found { background:radial-gradient(900px 600px at 50% 40%, rgba(255,200,87,.22), transparent 70%); }
+  .rings { position:absolute; left:50%; top:38%; width:10px; height:10px; }
+  .rings i { position:absolute; left:-1px; top:-1px; width:2px; height:2px; border-radius:50%; border:3px solid rgba(255,209,102,.55); animation:ring 2.6s ease-out infinite; }
+  .rings i:nth-child(2) { animation-delay:.85s; } .rings i:nth-child(3) { animation-delay:1.7s; }
+  @keyframes ring { to { width:min(90vh, 820px); height:min(90vh, 820px); left:calc(min(90vh,820px) / -2); top:calc(min(90vh,820px) / -2); opacity:0; border-width:1px; } }
+  .badge { font-size:22px; letter-spacing:.3em; color:var(--gold); font-weight:700; }
+  .picwrap { position:relative; width:min(46vh, 420px); aspect-ratio:1; border-radius:36px; background:linear-gradient(145deg, rgba(255,255,255,.18), rgba(255,255,255,.05)); border:2px solid rgba(255,209,102,.7); box-shadow:0 0 70px rgba(255,209,102,.4), 0 20px 50px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; animation:float 2.4s ease-in-out infinite alternate; overflow:hidden; }
+  @keyframes float { from { transform:translateY(-6px); } to { transform:translateY(8px); } }
+  .picwrap svg { width:78%; height:78%; }
+  .picwrap img { width:100%; height:100%; object-fit:cover; }
+  .found-zh { font-size:clamp(34px, 7.4vh, 68px); font-weight:800; text-shadow:0 4px 24px rgba(0,0,0,.45); line-height:1.2; }
+  .found-tw { min-height:40px; }
+  .found-tw b { display:inline-block; margin-right:10px; padding:2px 12px; border-radius:8px; background:rgba(255,209,102,.18); font-size:.7em; letter-spacing:.2em; }
+  .spk { display:inline-flex; align-items:center; gap:4px; margin-right:14px; vertical-align:middle; }
+  .spk svg { width:34px; height:34px; fill:var(--gold); }
+  .spk s { display:block; width:5px; border-radius:3px; background:var(--gold); animation:wave .9s ease-in-out infinite alternate; }
+  .spk s:nth-of-type(1) { height:14px; } .spk s:nth-of-type(2) { height:26px; animation-delay:.2s; } .spk s:nth-of-type(3) { height:18px; animation-delay:.4s; }
+  @keyframes wave { from { transform:scaleY(.35); } to { transform:scaleY(1.15); } }
+  .found-list { font-size:18px; color:var(--dim); min-height:26px; }
+  .controls { display:flex; gap:22px; justify-content:center; padding-top:10px; }
+  .big { flex:1; max-width:460px; min-height:clamp(84px, 13vh, 120px); border:none; border-radius:26px; font-size:clamp(26px, 4.2vh, 38px); font-weight:800; color:#fff; touch-action:manipulation; transition:transform .08s; display:flex; align-items:center; justify-content:center; gap:14px; }
+  .big:active { transform:scale(.96); }
+  .big:disabled { opacity:.35; }
+  .big.stop { background:linear-gradient(145deg,#ff7a7a,#d93b3b); box-shadow:0 10px 30px rgba(217,59,59,.45); }
+  .big.go { background:linear-gradient(145deg,#4be3b0,#1c9d73); box-shadow:0 10px 30px rgba(28,157,115,.45); }
+  .big svg { width:1.1em; height:1.1em; }
+  #welcome .state-title { font-size:clamp(40px, 7vh, 64px); }
+  #welcome .big { max-width:420px; flex:none; width:min(80vw, 420px); background:linear-gradient(145deg,#5aa8ff,#2f6fdd); box-shadow:0 10px 30px rgba(47,111,221,.5); }
+
+  /* 除錯台（工程師模式） */
+  #debug { flex:1; display:none; flex-direction:column; min-height:0; gap:8px; padding-top:10px; }
+  #debug.show { display:flex; }
+  .dstat { display:flex; flex-wrap:wrap; gap:6px 22px; padding:8px 14px; border-radius:12px; background:var(--glass); border:1px solid var(--line); color:var(--dim); font-size:15px; }
+  .dstat b { color:var(--fg); }
+  .dbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .dbar button { background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font-size:14px; }
+  .dbar button:hover:not(:disabled) { border-color:var(--accent); }
+  .dbar button:disabled { opacity:.4; cursor:default; }
+  .dbar label { font-size:14px; color:var(--dim); cursor:pointer; }
+  #filters { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:14px; }
+  #filters label { cursor:pointer; }
+  #log { flex:1; overflow-y:auto; padding:10px 14px; border-radius:12px; background:rgba(0,0,0,.28); border:1px solid var(--line); font:13px/1.55 Consolas, "Cascadia Mono", monospace; user-select:text; }
+  #log div { white-space:pre-wrap; word-break:break-all; }
+  .t { color:var(--dim); }
+  .sys { color:var(--dim); }
+  .evt { color:var(--ok); font-weight:700; }
+  .tag-ERR { color:var(--bad); }
+  .tag-AI, .tag-AI_FRAME { color:#c792ea; }
+  .tag-NAV { color:var(--accent); }
+  .tag-SCAN, .tag-STR { color:#8aa0b4; }
+  .tag-APP, .tag-SYS { color:var(--warn); }
+  .tag-BLE, .tag-BTN { color:#6fd0c4; }
+  .dsend { display:flex; gap:8px; }
+  .dsend input { flex:1; min-width:120px; background:rgba(0,0,0,.28); color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:7px 12px; font:inherit; }
+  .dsend button { background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:6px 16px; }
+
+  #demo { position:fixed; right:10px; bottom:6px; font-size:12px; color:var(--dim); display:none; }
+  #demo button { font-size:12px; padding:3px 8px; margin-left:4px; border-radius:6px; border:1px solid var(--line); background:var(--glass); }
+</style>
+</head>
+<body class="elder">
+<div id="app">
+  <div class="top">
+    <div class="logo">銀風巡弋<small>守護長者居家安全的 AI 失物巡檢小車</small></div>
+    <div class="grow"></div>
+    <div class="seg"><button id="modeElder" class="on">提示機</button><button id="modeDebug">除錯台</button></div>
+    <button class="mini" id="fsBtn">全螢幕</button>
+    <div class="chip"><span class="dot" id="dot"></span><span id="connText">未連線</span></div>
+  </div>
+
+  <!-- 提示機：長者看的畫面 -->
+  <div id="elder">
+    <div class="stage">
+      <div class="view show" id="welcome">
+        <svg width="150" height="150" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="#5aa8ff" stroke-width="3" stroke-dasharray="6 8"/><path d="M30 62 L50 28 L70 62 Z" fill="#5aa8ff" opacity=".9"/><circle cx="50" cy="50" r="6" fill="#fff"/></svg>
+        <div class="state-title">連線小車，開始守護</div>
+        <div class="state-sub">請先確認小車已開機，再按下方按鈕選擇 micro:bit</div>
+        <div class="controls"><button class="big" id="connectBtn">連線小車</button></div>
+      </div>
+      <div class="view" id="patrol">
+        <div class="radar idle" id="radar">
+          <div class="sweep"></div>
+          <svg class="car" viewBox="0 0 100 80" aria-hidden="true"><rect x="8" y="26" width="84" height="40" rx="12" fill="#4a90d9" stroke="#cfe3ff" stroke-width="3"/><circle cx="30" cy="68" r="11" fill="#222" stroke="#cfe3ff" stroke-width="2"/><circle cx="70" cy="68" r="11" fill="#222" stroke="#cfe3ff" stroke-width="2"/><circle cx="36" cy="44" r="5" fill="#fff"/><circle cx="64" cy="44" r="5" fill="#fff"/><rect x="46" y="8" width="8" height="18" fill="#2a6aa8"/><circle cx="50" cy="10" r="10" fill="#ffd166" stroke="#a87c1b" stroke-width="2"/></svg>
+        </div>
+        <div class="state-title" id="pTitle">小車待機中</div>
+        <div class="state-sub" id="pSub">按「開始找」，小車就會出發</div>
+        <div class="lanes" id="lanes"></div>
+      </div>
+      <div class="view" id="found">
+        <div class="rings"><i></i><i></i><i></i></div>
+        <div class="badge">★ 找 到 了 ★</div>
+        <div class="picwrap" id="pic"></div>
+        <div class="found-tw" id="fTw"></div>
+        <div class="found-list" id="fList"></div>
+      </div>
+    </div>
+    <div class="controls" id="ctrl" hidden>
+      <button class="big stop" id="stopBtn"><svg viewBox="0 0 24 24" fill="#fff"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span>停下來</span></button>
+      <button class="big go" id="goBtn"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4 L20 12 L7 20 Z"/></svg><span id="goText">開始找</span></button>
+    </div>
+  </div>
+
+  <!-- 除錯台：工程師看的畫面 -->
+  <div id="debug">
+    <div class="dstat">
+      <span>狀態 <b id="dState">—</b></span>
+      <span>航道 <b id="dLane">—</b> / <b id="dExp">—</b></span>
+      <span>最近事件 <b id="dEvt">—</b></span>
+    </div>
+    <div class="dbar">
+      <button id="dConnect">連線小車</button>
+      <button id="dDisc" disabled>中斷連線</button>
+      <button data-cmd="GO" disabled>GO 開始／繼續</button>
+      <button data-cmd="STOP" disabled>STOP 停止</button>
+      <button data-cmd="ST?" disabled>查狀態</button>
+      <button data-cmd="AB" disabled>A+B 日誌</button>
+      <span class="grow"></span>
+      <label><input type="checkbox" id="showTime" checked> 時間</label>
+      <label><input type="checkbox" id="autoScroll" checked> 自動捲動</label>
+      <button id="clearBtn">清除</button>
+      <button id="saveBtn">下載記錄</button>
+    </div>
+    <div id="filters"></div>
+    <div id="log"></div>
+    <div class="dsend"><input type="text" id="input" placeholder="自訂指令（Enter 送出）" disabled><button id="sendBtn" disabled>送出</button></div>
+  </div>
+</div>
+<div id="demo">預覽：<button data-d="DROPS">眼藥水</button><button data-d="PILL">藥丸</button><button data-d="TAG">磁扣</button><button data-d="PATROL">巡邏</button><button data-d="IDLE">待機</button></div>
+
+<script>
+const NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const UART_CHAR_A = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // micro:bit → 電腦 (notify)
+const UART_CHAR_B = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // 電腦 → micro:bit (write)
+const CHUNK = 20;
+const $ = id => document.getElementById(id);
+
+// ---------- 資料：失物（華語、台語字幕、台語語音檔、照片）----------
+const ITEMS = {
+  DROPS: { name:"眼藥水", zh:"爺爺，找到眼藥水囉！", tw:"阿公，目藥水揣著矣！", audio:"audio/drops.mp3", photo:"img/drops.jpg" },
+  PILL:  { name:"藥丸",   zh:"奶奶，找到降血壓藥丸囉！", tw:"阿嬤，降血壓的藥丸揣著矣！", audio:"audio/pill.mp3", photo:"img/pill.jpg" },
+  TAG:   { name:"感應磁扣", zh:"找到大門感應磁扣囉！", tw:"大門的感應扣揣著矣！", audio:"audio/tag.mp3", photo:"img/tag.jpg" },
+};
+const ICONS = {
+  DROPS: '<svg viewBox="0 0 100 100"><rect x="38" y="44" width="24" height="46" rx="8" fill="#7fd3d9" stroke="#fff" stroke-width="3"/><rect x="42" y="26" width="16" height="18" rx="3" fill="#2f9aa5" stroke="#fff" stroke-width="3"/><path d="M50 6 C44 14 42 18 42 22 a8 8 0 0 0 16 0 c0 -4 -2 -8 -8 -16 z" fill="#aee8ff" stroke="#fff" stroke-width="2.5"/></svg>',
+  PILL:  '<svg viewBox="0 0 100 100"><g transform="rotate(-35 50 50)"><rect x="12" y="34" width="76" height="32" rx="16" fill="#ff6b6b" stroke="#fff" stroke-width="3"/><path d="M50 34 h22 a16 16 0 0 1 0 32 h-22 z" fill="#ffd166" stroke="#fff" stroke-width="3"/></g></svg>',
+  TAG:   '<svg viewBox="0 0 100 100"><rect x="26" y="16" width="48" height="68" rx="20" fill="#4a86f0" stroke="#fff" stroke-width="3"/><circle cx="50" cy="32" r="7" fill="#0b1530" stroke="#fff" stroke-width="2.5"/><circle cx="50" cy="58" r="13" fill="none" stroke="#fff" stroke-width="3"/><circle cx="50" cy="58" r="5" fill="#fff"/></svg>',
+};
+const STATE_NAMES = ["待機", "巡航", "調查", "警報(尋獲)", "換道轉向", "完工"];
+const STATE_TEXT = {
+  0: ["小車待機中", "按「開始找」，小車就會出發"],
+  1: ["小車巡邏中", "正在地板上仔細地找東西…"],
+  2: ["發現可疑物品", "小車放慢速度確認中…"],
+  4: ["小車換道中", "轉個彎，繼續找下一排"],
+  5: ["巡檢完成 ✓", "整個房間都找過了"],
+};
+
+// ---------- 模式切換 ----------
+let mode = "elder";
+function setMode(m) {
+  mode = m;
+  document.body.classList.toggle("elder", m === "elder");
+  $("elder").style.display = m === "elder" ? "flex" : "none";
+  $("debug").classList.toggle("show", m === "debug");
+  $("modeElder").classList.toggle("on", m === "elder");
+  $("modeDebug").classList.toggle("on", m === "debug");
+  if (m === "debug") $("log").scrollTop = $("log").scrollHeight;
+}
+$("modeElder").addEventListener("click", () => setMode("elder"));
+$("modeDebug").addEventListener("click", () => setMode("debug"));
+
+// ---------- 提示機畫面 ----------
+let curState = 0, lane = 0, expected = 6, foundSet = [];
+function showView(id) {
+  ["welcome", "patrol", "found"].forEach(v => $(v).classList.toggle("show", v === id));
+  $("ctrl").hidden = (id === "welcome");
+  $("goText").textContent = id === "found" ? "我撿起來了，繼續找" : (curState === 0 || curState === 5 ? "開始找" : "繼續找");
+}
+function renderLanes() {
+  const box = $("lanes"); box.textContent = "";
+  for (let i = 1; i <= expected; i++) {
+    const el = document.createElement("i");
+    if (i < lane) el.className = "done"; else if (i === lane && curState !== 0) el.className = "now";
+    box.appendChild(el);
+  }
+}
+function renderPatrol() {
+  const [t, s] = STATE_TEXT[curState] || STATE_TEXT[0];
+  $("pTitle").textContent = t;
+  $("pSub").textContent = lane > 0 && curState !== 0 && curState !== 5 ? `${s}　（第 ${lane} / ${expected} 排）` : s;
+  $("radar").classList.toggle("idle", curState === 0 || curState === 5);
+  renderLanes();
+  $("dState").textContent = STATE_NAMES[curState] ?? curState;
+  $("dLane").textContent = lane || "—"; $("dExp").textContent = expected;
+  if (!$("found").classList.contains("show")) showView(connected || demoMode ? "patrol" : "welcome");
+}
+
+// ---------- 失物通知：圖片 + 台語語音 ----------
+let audio = null, chime = null;
+function playTaiwanese(name) {
+  const it = ITEMS[name];
+  try { if (audio) audio.pause(); } catch {}
+  audio = new Audio(it.audio);
+  audio.play().catch(() => {                       // 沒有台語 mp3 時，改用電腦華語語音
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(it.zh); u.lang = "zh-TW"; u.rate = .9;
+    speechSynthesis.speak(u);
+  });
+}
+function setPicture(name) {
+  const box = $("pic");
+  box.innerHTML = ICONS[name];
+  const img = new Image();
+  img.onload = () => { box.textContent = ""; box.appendChild(img); };
+  img.src = ITEMS[name].photo;
+}
+function beep() {
+  try {
+    chime = chime || new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1175, 1480].forEach((f, i) => {
+      const o = chime.createOscillator(), g = chime.createGain();
+      o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(chime.destination);
+      const t0 = chime.currentTime + i * .16;
+      g.gain.setValueAtTime(.25, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + .3);
+      o.start(t0); o.stop(t0 + .32);
+    });
+  } catch {}
+}
+function showFound(name, quiet) {
+  if (!foundSet.includes(name)) foundSet.push(name);
+  const it = ITEMS[name];
+  $("fTw").innerHTML = '<span class="spk"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3z"/></svg><s></s><s></s><s></s></span>';
+  $("fList").textContent = foundSet.length > 1 ? "目前找到：" + foundSet.map(n => ITEMS[n].name).join("、") : "";
+  setPicture(name);
+  setMode("elder");                                // 找到失物時，一律切回提示機畫面
+  showView("found");
+  if (!quiet) { beep(); setTimeout(() => playTaiwanese(name), 500); }
+}
+function endFound() {
+  foundSet = [];
+  if (audio) { try { audio.pause(); } catch {} }
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  $("found").classList.remove("show");
+  renderPatrol();
+}
+
+// ---------- 除錯台：記錄 ----------
+const logEl = $("log"), records = [], hiddenTags = new Set(), knownTags = new Set();
+const stamp = () => new Date().toLocaleTimeString("zh-TW", { hour12:false });
+function addLine(kind, text, tag) {
+  const time = stamp();
+  records.push(time + " " + (tag ? "[" + tag + "] " : "") + text);
+  if (records.length > 20000) records.shift();
+  const row = document.createElement("div");
+  row.className = kind + (tag ? " tag-" + tag : "");
+  if (tag) { row.dataset.tag = tag; if (hiddenTags.has(tag)) row.hidden = true; }
+  const t = document.createElement("span");
+  t.className = "t"; t.hidden = !$("showTime").checked; t.textContent = time + " ";
+  row.appendChild(t);
+  row.appendChild(document.createTextNode((tag ? "[" + tag + "] " : "") + text));
+  logEl.appendChild(row);
+  while (logEl.childElementCount > 1500) logEl.removeChild(logEl.firstChild);
+  if ($("autoScroll").checked) logEl.scrollTop = logEl.scrollHeight;
+}
+function registerTag(tag) {
+  if (knownTags.has(tag)) return;
+  knownTags.add(tag);
+  const lab = document.createElement("label"), cb = document.createElement("input");
+  cb.type = "checkbox"; cb.checked = true;
+  cb.addEventListener("change", () => {
+    if (cb.checked) hiddenTags.delete(tag); else hiddenTags.add(tag);
+    logEl.querySelectorAll('div[data-tag="' + tag + '"]').forEach(r => r.hidden = !cb.checked);
+  });
+  lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + tag));
+  $("filters").appendChild(lab);
+}
+$("showTime").addEventListener("change", () => logEl.querySelectorAll(".t").forEach(t => t.hidden = !$("showTime").checked));
+$("clearBtn").addEventListener("click", () => { logEl.textContent = ""; records.length = 0; });
+$("saveBtn").addEventListener("click", () => {
+  const blob = new Blob([records.join("\r\n")], { type:"text/plain;charset=utf-8" });
+  const a = document.createElement("a"), d = new Date(), p = n => String(n).padStart(2, "0");
+  a.href = URL.createObjectURL(blob);
+  a.download = `silverwind_log_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.txt`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+// ---------- 接收小車訊息 ----------
+function handleLine(line) {
+  if (line.startsWith("LOG=")) {
+    const body = line.slice(4), i = body.indexOf("|");
+    const tag = i > 0 ? body.slice(0, i) : "LOG";
+    registerTag(tag);
+    addLine("rx", i > 0 ? body.slice(i + 1) : body, tag);
+  } else if (line.startsWith("EVT=")) {
+    const name = line.slice(4);
+    $("dEvt").textContent = (ITEMS[name]?.name || name) + " @ " + stamp();
+    addLine("evt", "事件 " + name);
+    if (ITEMS[name]) showFound(name);
+    else if (name === "RESUME") { curState = 1; endFound(); }
+    else if (name === "STANDBY") { curState = 0; endFound(); }
+    else if (name === "COMPLETE") { curState = 5; endFound(); }
+  } else if (line.startsWith("ST=")) {
+    const p = line.slice(3).split(",").map(Number);
+    curState = p[0]; lane = p[1] || 0; expected = p[2] || 6;
+    if (curState !== 3) renderPatrol();
+    addLine("sys", "狀態 " + (STATE_NAMES[curState] ?? curState) + "，航道 " + lane + "/" + expected);
+  } else {
+    addLine("rx", line);
+  }
+}
+let rxBuffer = ""; const decoder = new TextDecoder();
+function onNotify(e) {
+  rxBuffer += decoder.decode(e.target.value, { stream:true });
+  let i;
+  while ((i = rxBuffer.search(/\r?\n/)) >= 0) {
+    const line = rxBuffer.slice(0, i);
+    rxBuffer = rxBuffer.slice(rxBuffer.indexOf("\n", i) + 1);
+    if (line.length) handleLine(line);
+  }
+  if (rxBuffer.length > 300) { addLine("rx", rxBuffer); rxBuffer = ""; }
+}
+
+// ---------- 藍牙連線 ----------
+let device = null, rxChar = null, connected = false, writeNoResp = true, userDisc = false, reconnTries = 0, queue = Promise.resolve(), pollTimer = null, wakeLock = null;
+function send(cmd, quiet) {
+  if (!connected || !rxChar) return;
+  const bytes = new TextEncoder().encode(cmd + "\n");
+  queue = queue.then(async () => {
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      const c = bytes.slice(i, i + CHUNK);
+      await (writeNoResp ? rxChar.writeValueWithoutResponse(c) : rxChar.writeValue(c));
+    }
+    if (!quiet) addLine("sys", "→ " + cmd);
+  }).catch(e => addLine("sys", "傳送失敗：" + e.message));
+}
+async function keepAwake(on) {
+  try {
+    if (on && navigator.wakeLock && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); }
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+function setConnected(on) {
+  connected = on;
+  $("dot").classList.toggle("on", on);
+  $("connText").textContent = on ? "小車已連線" : "未連線";
+  document.querySelectorAll("#debug [data-cmd], #sendBtn, #input").forEach(el => el.disabled = !on);
+  $("dConnect").disabled = on;
+  $("dDisc").disabled = !on;
+  clearInterval(pollTimer);
+  if (on) { pollTimer = setInterval(() => send("ST?", true), 4000); renderPatrol(); }
+  else { rxBuffer = ""; endFound(); showView(demoMode ? "patrol" : "welcome"); }
+  keepAwake(on);
+}
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("sw_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("sw_" + k, JSON.stringify(v)); } catch {} }
+};
+function onGattDisc() {
+  setConnected(false); addLine("sys", "已中斷連線");
+  if (!userDisc) scheduleReconnect();           // 不是自己按的中斷（例如車子重開機），自動重連幾次
+}
+function scheduleReconnect() {
+  if (reconnTries >= 5) return;
+  reconnTries++;
+  setTimeout(async () => { if (!connected && !userDisc) { await autoConnect(); if (!connected) scheduleReconnect(); } }, 3000);
+}
+// 連過一次之後，瀏覽器會記住這台 micro:bit，之後開網頁不用再選裝置（需要瀏覽器支援 getDevices）
+function waitAdv(d, ms, ac) {
+  return new Promise(res => {
+    if (!d.watchAdvertisements) return res(false);
+    let fin = false;
+    const done = ok => { if (fin) return; fin = true; clearTimeout(t); d.removeEventListener("advertisementreceived", h); res(ok); };
+    const h = () => done(true), t = setTimeout(() => done(false), ms);
+    d.addEventListener("advertisementreceived", h);
+    d.watchAdvertisements({ signal: ac.signal }).catch(() => done(false));
+  });
+}
+async function autoConnect() {
+  if (connected || !navigator.bluetooth) return false;
+  if (!navigator.bluetooth.getDevices) { addLine("sys", "自動連線：這個瀏覽器沒有 getDevices()，請到 chrome://flags（Edge 是 edge://flags）開啟 Web Bluetooth 的 new permissions backend"); return false; }
+  try {
+    const all = await navigator.bluetooth.getDevices();
+    const list = all.filter(d => (d.name || "").startsWith("BBC micro:bit"));
+    if (!list.length) { addLine("sys", `自動連線：瀏覽器沒有記住任何 micro:bit（記住的裝置共 ${all.length} 個）。請先按「連線小車」手動連一次`); return false; }
+    const last = store.get("devId", null), d = list.find(x => x.id === last) || list[0];
+    addLine("sys", `自動連線：找到 ${list.length} 台已記住的 micro:bit，等待它的藍牙廣播…（最多 10 秒）`);
+    const ac = new AbortController();
+    const seen = await waitAdv(d, 10000, ac);   // Chrome 要先「看見」裝置才允許連線，否則會說 no longer in range
+    addLine("sys", seen ? "自動連線：已偵測到 micro:bit，連線中…" : "自動連線：沒偵測到廣播，仍嘗試連線…");
+    await connect(d, true);
+    ac.abort();
+  } catch {}
+  return connected;
+}
+async function connect(dev, auto) {
+  if (!navigator.bluetooth) { alert("這個瀏覽器不支援藍牙連線，請改用 Windows 或 Android 的 Chrome／Edge。"); return; }
+  let step = "選擇裝置";
+  try {
+    userDisc = false;
+    device = dev || await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:"BBC micro:bit" }], optionalServices:[NUS_SERVICE] });
+    if (!device._hooked) { device._hooked = true; device.addEventListener("gattserverdisconnected", onGattDisc); }
+    $("connText").textContent = "連線中…";
+    step = "建立 GATT 連線";
+    let server;
+    for (let i = 0; i < 3; i++) { try { server = await device.gatt.connect(); break; } catch (e) { if (i === 2) throw e; await new Promise(r => setTimeout(r, 800)); } }
+    await new Promise(r => setTimeout(r, 300));
+    step = "尋找 UART 服務";
+    const service = await server.getPrimaryService(NUS_SERVICE);
+    const chA = await service.getCharacteristic(UART_CHAR_A), chB = await service.getCharacteristic(UART_CHAR_B);
+    const canNotify = c => c.properties.notify || c.properties.indicate, canWrite = c => c.properties.write || c.properties.writeWithoutResponse;
+    const txChar = canNotify(chA) ? chA : chB;
+    rxChar = canWrite(chB) ? chB : chA;
+    writeNoResp = !!rxChar.properties.writeWithoutResponse;
+    step = "啟用通知";
+    await txChar.startNotifications();
+    txChar.addEventListener("characteristicvaluechanged", onNotify);
+    reconnTries = 0; store.set("devId", device.id);
+    setConnected(true);
+    addLine("sys", (auto ? "自動連線：" : "已連線：") + device.name);
+    send("ST?", true);
+  } catch (e) {
+    setConnected(false);
+    $("connText").textContent = "連線失敗，請再試一次";
+    addLine("sys", `${auto ? "自動連線" : "連線"}失敗（${step}）：${e.message}`);
+    try { device?.gatt?.disconnect(); } catch {}
+  }
+}
+$("connectBtn").addEventListener("click", () => { beep(); connect(); });
+$("dConnect").addEventListener("click", () => connect());
+$("dDisc").addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } });
+$("dot").parentElement.addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } else if (mode === "debug") connect(); });
+
+// ---------- 操作：長者按鈕 + 除錯指令 ----------
+$("stopBtn").addEventListener("click", () => { send("STOP"); if (demoMode) { curState = 0; endFound(); } });
+$("goBtn").addEventListener("click", () => { send("GO"); if (demoMode) { curState = 1; endFound(); } });
+document.querySelectorAll("#debug [data-cmd]").forEach(b => b.addEventListener("click", () => send(b.dataset.cmd)));
+function submitInput() { const v = $("input").value.trim(); if (v) { send(v); $("input").value = ""; } }
+$("sendBtn").addEventListener("click", submitInput);
+$("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); submitInput(); } });
+$("fsBtn").addEventListener("click", () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d); });
+document.addEventListener("visibilitychange", () => { if (connected && document.visibilityState === "visible") keepAwake(true); });
+
+// ---------- 預覽：網址加 #demo=DROPS / PATROL / IDLE / DEBUG（可再加 &clean 隱藏預覽列）；#debug 直接進除錯台 ----------
+const demoMode = location.hash.startsWith("#demo");
+if (demoMode) {
+  $("demo").style.display = location.hash.includes("clean") ? "none" : "block";
+  $("demo").addEventListener("click", e => {
+    const d = e.target.dataset.d; if (!d) return;
+    if (ITEMS[d]) { foundSet = []; showFound(d); }
+    else { curState = d === "PATROL" ? 1 : 0; lane = d === "PATROL" ? 3 : 0; endFound(); }
+  });
+  const m = (location.hash.split("=")[1] || "").split("&")[0];
+  expected = 6; lane = 3;
+  $("dot").classList.add("on"); $("connText").textContent = "小車已連線";
+  if (ITEMS[m]) { curState = 1; showFound(m, true); }
+  else if (m === "DEBUG") {
+    curState = 1; renderPatrol(); setMode("debug");
+    ["LOG=SYS|Maqueen Plus V3 + HuskyLens 2 (Model 129) + LiDAR Ready.", "LOG=APP|Patrol STARTED from Lane 1", "LOG=STR|x1:999 x2:31 x5:29 x6:999 err:2 L:65 R:25", "LOG=AI_FRAME|eyedrops (ID:1) at (120,88) 64x70", "LOG=AI|Confirmed: Drops=True Pill=False Tag=False Total=1", "LOG=NAV|Front wall at 12cm. Turning to check next lane...", "ST=1,2,6"].forEach(handleLine);
+  } else { curState = m === "IDLE" ? 0 : 1; renderPatrol(); }
+} else {
+  renderLanes();
+  // 目前只用除錯台：預設直接進除錯台並隱藏模式切換鈕；網址加 #elder 才顯示提示機與切換鈕
+  if (location.hash === "#elder") setMode("elder");
+  else { $("modeElder").parentElement.style.display = "none"; setMode("debug"); }
+  autoConnect();   // 開網頁時自動連上已記住的 micro:bit；第一次要先按「連線小車」選一次
+}
+</script>
+</body>
+</html>
