@@ -2,14 +2,19 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>銀風巡弋 提示機與除錯台</title>
+<meta name="theme-color" content="#0b1530">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root { --bg1:#0b1530; --bg2:#14315f; --glass:rgba(255,255,255,.08); --line:rgba(255,255,255,.18); --fg:#f2f6ff; --dim:#9fb3d6; --ok:#38d39f; --warn:#ffc857; --bad:#ff6b6b; --gold:#ffd166; --accent:#5aa8ff; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { height:100%; margin:0; }
   body { color:var(--fg); font-family:"Microsoft JhengHei","PingFang TC",system-ui,sans-serif; background:radial-gradient(1200px 800px at 20% 10%, var(--bg2), var(--bg1)); overflow:hidden; }
-  body.elder { user-select:none; }
+  body { overscroll-behavior:none; touch-action:manipulation; }
+  body.elder { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
   #app { height:100%; display:flex; flex-direction:column; padding:max(14px, env(safe-area-inset-top)) 28px 20px; }
   button { font:inherit; color:var(--fg); cursor:pointer; }
 
@@ -76,6 +81,21 @@
   #welcome .state-title { font-size:clamp(40px, 7vh, 64px); }
   #welcome .big { max-width:420px; flex:none; width:min(80vw, 420px); background:linear-gradient(145deg,#5aa8ff,#2f6fdd); box-shadow:0 10px 30px rgba(47,111,221,.5); }
 
+  /* Android 平板：聲音解鎖提示、橫放時縮小以免超出螢幕 */
+  #soundHint { align-self:center; margin-top:6px; padding:8px 20px; border-radius:999px; background:rgba(255,200,87,.18); border:1px solid rgba(255,200,87,.6); color:#ffe2a1; font-size:clamp(16px, 2.4vh, 22px); animation:pulse 1.4s infinite alternate; white-space:nowrap; }
+  @media (orientation:landscape) and (max-height:760px) {
+    #app { padding-bottom:12px; }
+    .logo { font-size:22px; } .logo small { display:none; }
+    .view { gap:10px; }
+    .radar { width:min(36vh, 280px); }
+    .picwrap { width:min(48vh, 320px); }
+    .badge { font-size:18px; }
+    .state-title { font-size:clamp(28px, 6vh, 44px); }
+    .state-sub { font-size:clamp(16px, 2.6vh, 22px); }
+    .big { min-height:72px; font-size:clamp(22px, 4vh, 30px); }
+    .controls { padding-top:4px; }
+  }
+
   /* 除錯台（工程師模式） */
   #debug { flex:1; display:none; flex-direction:column; min-height:0; gap:8px; padding-top:10px; }
   #debug.show { display:flex; }
@@ -86,6 +106,11 @@
   .dbar button:hover:not(:disabled) { border-color:var(--accent); }
   .dbar button:disabled { opacity:.4; cursor:default; }
   .dbar label { font-size:14px; color:var(--dim); cursor:pointer; }
+  .dbar .lbl { font-size:13px; color:var(--dim); padding-right:4px; }
+  .dbar input[type=number] { width:76px; background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:14px; color:var(--fg); }
+  .dbar input[type=number]:disabled { opacity:.4; }
+  .dstat b.ok { color:#4ade80; }
+  .dstat b.bad { color:#ff6b6b; }
   #filters { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:14px; }
   #filters label { cursor:pointer; }
   #log { flex:1; overflow-y:auto; padding:10px 14px; border-radius:12px; background:rgba(0,0,0,.28); border:1px solid var(--line); font:13px/1.55 Consolas, "Cascadia Mono", monospace; user-select:text; }
@@ -113,6 +138,7 @@
     <div class="logo">銀風巡弋<small>守護長者居家安全的 AI 失物巡檢小車</small></div>
     <div class="grow"></div>
     <div class="seg"><button id="modeElder" class="on">提示機</button><button id="modeDebug">除錯台</button></div>
+    <button class="mini" id="soundBtn">測試聲音</button>
     <button class="mini" id="fsBtn">全螢幕</button>
     <div class="chip"><span class="dot" id="dot"></span><span id="connText">未連線</span></div>
   </div>
@@ -123,7 +149,7 @@
       <div class="view show" id="welcome">
         <svg width="150" height="150" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="#5aa8ff" stroke-width="3" stroke-dasharray="6 8"/><path d="M30 62 L50 28 L70 62 Z" fill="#5aa8ff" opacity=".9"/><circle cx="50" cy="50" r="6" fill="#fff"/></svg>
         <div class="state-title">連線小車，開始守護</div>
-        <div class="state-sub">請先確認小車已開機，再按下方按鈕選擇 micro:bit</div>
+        <div class="state-sub" id="wSub">請先確認小車已開機，再按下方按鈕選擇 micro:bit</div>
         <div class="controls"><button class="big" id="connectBtn">連線小車</button></div>
       </div>
       <div class="view" id="patrol">
@@ -143,6 +169,7 @@
         <div class="found-list" id="fList"></div>
       </div>
     </div>
+    <div id="soundHint">🔈 請先點一下螢幕，開啟聲音</div>
     <div class="controls" id="ctrl" hidden>
       <button class="big stop" id="stopBtn"><svg viewBox="0 0 24 24" fill="#fff"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span>停下來</span></button>
       <button class="big go" id="goBtn"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4 L20 12 L7 20 Z"/></svg><span id="goText">開始找</span></button>
@@ -155,6 +182,8 @@
       <span>狀態 <b id="dState">—</b></span>
       <span>航道 <b id="dLane">—</b> / <b id="dExp">—</b></span>
       <span>最近事件 <b id="dEvt">—</b></span>
+      <span>lens <b id="dLens">—</b></span>
+      <span>模型 <b id="dModel">—</b></span>
     </div>
     <div class="dbar">
       <button id="dConnect">連線小車</button>
@@ -168,6 +197,16 @@
       <label><input type="checkbox" id="autoScroll" checked> 自動捲動</label>
       <button id="clearBtn">清除</button>
       <button id="saveBtn">下載記錄</button>
+    </div>
+    <div class="dbar" id="lensBar">
+      <span class="lbl">lens 工具</span>
+      <button data-cmd="LENS" disabled title="重新向 lens 敲門並切到目前模型">重新握手</button>
+      <input type="number" id="modelId" value="128" min="128" max="255" disabled title="自訂模型編號 (吟風目前是 128)">
+      <button id="modelBtn" disabled title="切換到左邊輸入的模型編號">套用模型</button>
+      <button data-cmd="LENS:SCAN" disabled title="待機中依序試 128~136，找出有回應的編號">搜尋模型</button>
+      <button data-cmd="UARTSCAN" disabled title="待機中試腳位正反與 115200/9600">腳位掃描</button>
+      <button data-cmd="SWAP" disabled title="對調 P13/P14 收發並重新握手">對調 TX/RX</button>
+      <button data-cmd="LOOP" disabled title="拔掉 lens、短接 P13-P14 後按，應收到 16 bytes">迴路測試</button>
     </div>
     <div id="filters"></div>
     <div id="log"></div>
@@ -245,11 +284,17 @@ function renderPatrol() {
 
 // ---------- 失物通知：圖片 + 台語語音 ----------
 let audio = null, chime = null;
+// 從網站開啟 (http/https) 時先整檔抓下來再播放：避開 Service Worker 對音訊 Range 請求的相容問題，離線也能播；
+// 直接開本機檔案 (file://) 不能 fetch，維持直接播放
+function loadAudio(url) {
+  if (!location.protocol.startsWith("http")) return Promise.resolve(new Audio(url));
+  return fetch(url).then(r => { if (!r.ok) throw new Error("audio " + r.status); return r.blob(); }).then(b => new Audio(URL.createObjectURL(b)));
+}
 function playTaiwanese(name) {
   const it = ITEMS[name];
   try { if (audio) audio.pause(); } catch {}
-  audio = new Audio(it.audio);
-  audio.play().catch(() => {                       // 沒有台語 mp3 時，改用電腦華語語音
+  loadAudio(it.audio).then(a => { audio = a; return a.play(); })
+    .catch(() => {                                 // 沒有台語 mp3 時，改用電腦華語語音
     if (!window.speechSynthesis) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(it.zh); u.lang = "zh-TW"; u.rate = .9;
@@ -263,9 +308,20 @@ function setPicture(name) {
   img.onload = () => { box.textContent = ""; box.appendChild(img); };
   img.src = ITEMS[name].photo;
 }
+// Android Chrome 規定要有使用者點擊後才能播放聲音：第一次點擊時解鎖，並隱藏提示
+function unlockAudio() {
+  try {
+    chime = chime || new (window.AudioContext || window.webkitAudioContext)();
+    if (chime.state === "suspended") chime.resume();
+  } catch {}
+  $("soundHint").hidden = true;
+}
+["pointerdown", "touchstart", "keydown"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive:true }));
+document.addEventListener("contextmenu", e => { if (mode === "elder") e.preventDefault(); });   // 長按不要跳出選單
 function beep() {
   try {
     chime = chime || new (window.AudioContext || window.webkitAudioContext)();
+    if (chime.state === "suspended") chime.resume();
     [880, 1175, 1480].forEach((f, i) => {
       const o = chime.createOscillator(), g = chime.createGain();
       o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(chime.destination);
@@ -333,11 +389,31 @@ $("saveBtn").addEventListener("click", () => {
   a.click(); URL.revokeObjectURL(a.href);
 });
 
+// ---------- lens 狀態：從 SYS 記錄解析 (Ready / Lens handshake / Lens model / Serial swapped / Scan model) ----------
+function setLens(ok) {
+  const el = $("dLens");
+  el.textContent = ok ? "OK" : "無回應";
+  el.classList.toggle("ok", ok); el.classList.toggle("bad", !ok);
+}
+function parseLens(text) {
+  const m = /model=(\d+)/.exec(text);
+  if (m) $("dModel").textContent = m[1];
+  const s = /(?:lens|online|handshake)=(OK|TIMEOUT)/.exec(text);
+  if (s) setLens(s[1] === "OK");
+  const sc = /^Scan model (\d+) reply_bytes=(\d+)/.exec(text);
+  if (sc && Number(sc[2]) > 0) { $("dModel").textContent = sc[1]; setLens(true); $("modelId").value = sc[1]; }
+}
+function resetLens() {
+  const el = $("dLens"); el.textContent = "—"; el.classList.remove("ok", "bad");
+  $("dModel").textContent = "—";
+}
+
 // ---------- 接收小車訊息 ----------
 function handleLine(line) {
   if (line.startsWith("LOG=")) {
     const body = line.slice(4), i = body.indexOf("|");
     const tag = i > 0 ? body.slice(0, i) : "LOG";
+    if (tag === "SYS" && i > 0) parseLens(body.slice(i + 1));
     registerTag(tag);
     addLine("rx", i > 0 ? body.slice(i + 1) : body, tag);
   } else if (line.startsWith("EVT=")) {
@@ -395,6 +471,8 @@ function setConnected(on) {
   document.querySelectorAll("#debug [data-cmd], #sendBtn, #input").forEach(el => el.disabled = !on);
   $("dConnect").disabled = on;
   $("dDisc").disabled = !on;
+  $("modelId").disabled = !on; $("modelBtn").disabled = !on;
+  resetLens();
   clearInterval(pollTimer);
   if (on) { pollTimer = setInterval(() => send("ST?", true), 4000); renderPatrol(); }
   else { rxBuffer = ""; endFound(); showView(demoMode ? "patrol" : "welcome"); }
@@ -424,6 +502,8 @@ function waitAdv(d, ms, ac) {
     d.watchAdvertisements({ signal: ac.signal }).catch(() => done(false));
   });
 }
+const WELCOME_SUB = "請先確認小車已開機，再按下方按鈕選擇 micro:bit";
+function setWelcome(msg) { $("wSub").textContent = msg || WELCOME_SUB; }
 async function autoConnect() {
   if (connected || !navigator.bluetooth) return false;
   if (!navigator.bluetooth.getDevices) { addLine("sys", "自動連線：這個瀏覽器沒有 getDevices()，請到 chrome://flags（Edge 是 edge://flags）開啟 Web Bluetooth 的 new permissions backend"); return false; }
@@ -433,12 +513,14 @@ async function autoConnect() {
     if (!list.length) { addLine("sys", `自動連線：瀏覽器沒有記住任何 micro:bit（記住的裝置共 ${all.length} 個）。請先按「連線小車」手動連一次`); return false; }
     const last = store.get("devId", null), d = list.find(x => x.id === last) || list[0];
     addLine("sys", `自動連線：找到 ${list.length} 台已記住的 micro:bit，等待它的藍牙廣播…（最多 10 秒）`);
+    setWelcome("正在自動連線小車，請稍候…");
     const ac = new AbortController();
     const seen = await waitAdv(d, 10000, ac);   // Chrome 要先「看見」裝置才允許連線，否則會說 no longer in range
     addLine("sys", seen ? "自動連線：已偵測到 micro:bit，連線中…" : "自動連線：沒偵測到廣播，仍嘗試連線…");
     await connect(d, true);
     ac.abort();
   } catch {}
+  if (!connected) setWelcome();
   return connected;
 }
 async function connect(dev, auto) {
@@ -476,6 +558,10 @@ async function connect(dev, auto) {
 }
 $("connectBtn").addEventListener("click", () => { beep(); connect(); });
 $("dConnect").addEventListener("click", () => connect());
+$("modelBtn").addEventListener("click", () => {
+  const n = parseInt($("modelId").value, 10);
+  if (n >= 128 && n <= 255) send("LENS:" + n); else addLine("sys", "模型編號要在 128 到 255 之間");
+});
 $("dDisc").addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } });
 $("dot").parentElement.addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } else if (mode === "debug") connect(); });
 
@@ -486,6 +572,7 @@ document.querySelectorAll("#debug [data-cmd]").forEach(b => b.addEventListener("
 function submitInput() { const v = $("input").value.trim(); if (v) { send(v); $("input").value = ""; } }
 $("sendBtn").addEventListener("click", submitInput);
 $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); submitInput(); } });
+$("soundBtn").addEventListener("click", () => { unlockAudio(); beep(); setTimeout(() => playTaiwanese("DROPS"), 500); });   // 設定時用：確認音量與聲音能播
 $("fsBtn").addEventListener("click", () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d); });
 document.addEventListener("visibilitychange", () => { if (connected && document.visibilityState === "visible") keepAwake(true); });
 
@@ -504,7 +591,7 @@ if (demoMode) {
   if (ITEMS[m]) { curState = 1; showFound(m, true); }
   else if (m === "DEBUG") {
     curState = 1; renderPatrol(); setMode("debug");
-    ["LOG=SYS|Maqueen Plus V3 + HuskyLens 2 (Model 129) + LiDAR Ready.", "LOG=APP|Patrol STARTED from Lane 1", "LOG=STR|x1:999 x2:31 x5:29 x6:999 err:2 L:65 R:25", "LOG=AI_FRAME|eyedrops (ID:1) at (120,88) 64x70", "LOG=AI|Confirmed: Drops=True Pill=False Tag=False Total=1", "LOG=NAV|Front wall at 12cm. Turning to check next lane...", "ST=1,2,6"].forEach(handleLine);
+    ["LOG=SYS|Ready. model=128 lens=OK", "LOG=APP|Patrol STARTED from Lane 1", "LOG=STR|x1:999 x2:31 x5:29 x6:999 err:2 L:65 R:25", "LOG=AI_FRAME|eyedrops (ID:1) at (120,88) 64x70", "LOG=AI|Confirmed: Drops=True Pill=False Tag=False Total=1", "LOG=NAV|Front wall at 12cm. Turning to check next lane...", "ST=1,2,6"].forEach(handleLine);
   } else { curState = m === "IDLE" ? 0 : 1; renderPatrol(); }
 } else {
   renderLanes();
@@ -512,6 +599,10 @@ if (demoMode) {
   if (location.hash === "#elder") setMode("elder");
   else { $("modeElder").parentElement.style.display = "none"; setMode("debug"); }
   autoConnect();   // 開網頁時自動連上已記住的 micro:bit；第一次要先按「連線小車」選一次
+}
+// 離線可用 (PWA)：只有從網站 (http/https) 開啟時才註冊；直接開本機檔案 (file://) 不註冊
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 </script>
 </body>
