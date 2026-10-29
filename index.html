@@ -115,6 +115,21 @@
   #filters label { cursor:pointer; }
   #log { flex:1; overflow-y:auto; padding:10px 14px; border-radius:12px; background:rgba(0,0,0,.28); border:1px solid var(--line); font:13px/1.55 Consolas, "Cascadia Mono", monospace; user-select:text; }
   #log div { white-space:pre-wrap; word-break:break-all; }
+  #dmain { flex:1; display:flex; gap:8px; min-height:0; }
+  #dmain #log { min-width:0; min-height:0; }
+  #lidarBox { width:372px; flex:none; overflow-y:auto; padding:10px 12px; border-radius:12px; background:rgba(0,0,0,.28); border:1px solid var(--line); display:flex; flex-direction:column; gap:8px; font-size:13px; }
+  #lidarBox .lhead { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+  #lidarBox button, #lidarBox select { background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:13px; color:var(--fg); }
+  #lidarBox button:disabled { opacity:.4; cursor:default; }
+  #lidarBox select option { color:#000; }
+  #lidarBox label { color:var(--dim); cursor:pointer; }
+  #lidGrid { display:grid; grid-template-columns:22px repeat(8, 1fr); gap:2px; width:100%; max-width:380px; }
+  #lidGrid .c { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:4px; font-size:11px; font-weight:700; color:#06101f; }
+  #lidGrid .ax { font-size:10px; color:var(--dim); display:flex; align-items:center; justify-content:center; }
+  #lidRows { font:12px/1.5 Consolas, "Cascadia Mono", monospace; color:var(--dim); white-space:pre; }
+  #lidWall { color:var(--gold); font-weight:700; }
+  #lidHint { font-size:12px; color:var(--dim); line-height:1.5; }
+  @media (max-width:900px) { #dmain { flex-direction:column; } #lidarBox { width:auto; max-height:48%; } }
   .t { color:var(--dim); }
   .sys { color:var(--dim); }
   .evt { color:var(--ok); font-weight:700; }
@@ -191,7 +206,6 @@
       <button data-cmd="GO" disabled>GO 開始／繼續</button>
       <button data-cmd="STOP" disabled>STOP 停止</button>
       <button data-cmd="ST?" disabled>查狀態</button>
-      <button data-cmd="AB" disabled>A+B 日誌</button>
       <span class="grow"></span>
       <label><input type="checkbox" id="showTime" checked> 時間</label>
       <label><input type="checkbox" id="autoScroll" checked> 自動捲動</label>
@@ -209,7 +223,26 @@
       <button data-cmd="LOOP" disabled title="拔掉 lens、短接 P13-P14 後按，應收到 16 bytes">迴路測試</button>
     </div>
     <div id="filters"></div>
-    <div id="log"></div>
+    <div id="dmain">
+      <div id="log"></div>
+      <div id="lidarBox">
+        <div class="lhead">
+          <b>光達 8×8</b>
+          <button data-cmd="LIDAR" disabled title="停著時馬上掃；巡邏中會等到下次遇牆停車才掃，不影響走直線">讀取光達</button>
+          <button data-cmd="LIDAR:NOW" disabled title="巡邏中也會當場停車約 2 秒再掃，可能讓車子走偏">立即讀取</button>
+          <select id="lidHist" title="歷史快照"></select>
+        </div>
+        <div class="lhead">
+          <label><input type="checkbox" id="lidAuto" disabled> 起跑／遇牆／換道自動回報</label>
+          <label><input type="checkbox" id="lidFlip"> 上下翻轉</label>
+        </div>
+        <div id="lidTag" class="sys">尚無資料，按「讀取光達」</div>
+        <div id="lidGrid"></div>
+        <div id="lidWall"></div>
+        <div id="lidRows"></div>
+        <div id="lidHint">顏色：紅 ≤12 cm、橙 ≤25、黃 ≤50、綠 ≤100、藍 &gt;100、灰「–」= 無效或超出範圍、暗「·」= 這格沒讀。<b>「即時」</b>只是把車子巡邏時本來就讀的 6 個點順便顯示，不會多讀光達；要看整面牆才按「讀取光達」。「打到東西的列」是該列至少 4 格在 100 cm 內，列數越少代表牆在光達眼裡越矮。y 方向若和實際上下相反，勾「上下翻轉」。讀光達和馬達共用 I2C，掃一次 64 點要約 2 秒，所以：停著時「讀取光達」馬上掃；<b>巡邏中會等到下次遇牆停車才掃</b>，不打斷走直線；「立即讀取」會當場停車，可能讓車子走偏；兩次掃描至少間隔 3 秒。自動回報只在起跑、遇牆、換道這些本來就會停的地方掃。</div>
+      </div>
+    </div>
     <div class="dsend"><input type="text" id="input" placeholder="自訂指令（Enter 送出）" disabled><button id="sendBtn" disabled>送出</button></div>
   </div>
 </div>
@@ -414,6 +447,8 @@ function handleLine(line) {
     const body = line.slice(4), i = body.indexOf("|");
     const tag = i > 0 ? body.slice(0, i) : "LOG";
     if (tag === "SYS" && i > 0) parseLens(body.slice(i + 1));
+    if (tag === "STR" && i > 0) parseLive(body.slice(i + 1));
+    if (tag === "SCAN" && i > 0) parseScan(body.slice(i + 1));
     registerTag(tag);
     addLine("rx", i > 0 ? body.slice(i + 1) : body, tag);
   } else if (line.startsWith("EVT=")) {
@@ -424,6 +459,8 @@ function handleLine(line) {
     else if (name === "RESUME") { curState = 1; endFound(); }
     else if (name === "STANDBY") { curState = 0; endFound(); }
     else if (name === "COMPLETE") { curState = 5; endFound(); }
+  } else if (line.startsWith("LID=")) {
+    handleLid(line.slice(4));
   } else if (line.startsWith("ST=")) {
     const p = line.slice(3).split(",").map(Number);
     curState = p[0]; lane = p[1] || 0; expected = p[2] || 6;
@@ -471,7 +508,7 @@ function setConnected(on) {
   document.querySelectorAll("#debug [data-cmd], #sendBtn, #input").forEach(el => el.disabled = !on);
   $("dConnect").disabled = on;
   $("dDisc").disabled = !on;
-  $("modelId").disabled = !on; $("modelBtn").disabled = !on;
+  $("modelId").disabled = !on; $("modelBtn").disabled = !on; $("lidAuto").disabled = !on;
   resetLens();
   clearInterval(pollTimer);
   if (on) { pollTimer = setInterval(() => send("ST?", true), 4000); renderPatrol(); }
@@ -549,6 +586,7 @@ async function connect(dev, auto) {
     setConnected(true);
     addLine("sys", (auto ? "自動連線：" : "已連線：") + device.name);
     send("ST?", true);
+    send($("lidAuto").checked ? "LIDAR:AUTO1" : "LIDAR:AUTO0", true);
   } catch (e) {
     setConnected(false);
     $("connText").textContent = "連線失敗，請再試一次";
@@ -564,6 +602,117 @@ $("modelBtn").addEventListener("click", () => {
 });
 $("dDisc").addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } });
 $("dot").parentElement.addEventListener("click", () => { if (connected) { userDisc = true; device.gatt.disconnect(); } else if (mode === "debug") connect(); });
+
+// ---------- 光達 8×8：完整快照 (LID=)、巡邏時車子本來就讀到的點 (STR 記錄)、起跑/遇牆的 3 列掃描 (SCAN 記錄) ----------
+const LID_LABEL = { REQ:"手動讀取", START:"起跑", WALL:"遇牆", SIDE:"換道側牆", LANE:"換道完成", SCAN:"3 列掃描" };
+let lidCur = null, lidTimer = null, lidHist = [], lidSel = "live", lidLive = { time:"", rows:{} }, scanCur = null, scanTimer = null;
+const hasD = d => typeof d === "number" && !isNaN(d);
+function lidColor(d) {
+  if (!hasD(d)) return "#161d33";                 // 沒有資料 (這格沒讀)
+  if (d <= 0 || d >= 999) return "#2a3350";       // 讀了但無效或超出範圍
+  if (d <= 12) return "#ff6b6b";
+  if (d <= 25) return "#ffa94d";
+  if (d <= 50) return "#ffd166";
+  if (d <= 100) return "#4be3b0";
+  return "#5aa8ff";
+}
+// 完整快照：LID=標籤|y|c0,...,c7，最後 LID=標籤|END
+function handleLid(body) {
+  const p = body.split("|"), tag = p[0];
+  if (p[1] === "END") { if (lidCur && lidCur.tag === tag) finishLid(); return; }
+  const y = parseInt(p[1], 10), vals = (p[2] || "").split(",").map(Number);
+  if (!(y >= 0 && y <= 7)) return;
+  if (!lidCur || lidCur.tag !== tag || y === 0) { if (lidCur) finishLid(); lidCur = { tag, rows:{}, time: stamp() }; }
+  lidCur.rows[y] = vals;
+  clearTimeout(lidTimer);
+  lidTimer = setTimeout(() => { if (lidCur) finishLid(); }, 4000);   // 沒收到 END 也要顯示已收到的列
+}
+function pushSnap(snap) {
+  lidHist.push(snap); if (lidHist.length > 30) lidHist.shift();
+  lidSel = String(lidHist.length - 1);
+  refreshLidSelect(); showLidSel();
+}
+function finishLid() {
+  clearTimeout(lidTimer);
+  const snap = lidCur; lidCur = null;
+  if (!snap || !Object.keys(snap.rows).length) return;
+  pushSnap(snap);
+  const lines = [];
+  for (let y = 0; y < 8; y++) lines.push("y" + y + ": " + (snap.rows[y] || []).join(" "));
+  addLine("sys", "光達快照 [" + (LID_LABEL[snap.tag] || snap.tag) + "]\n" + lines.join("\n"));
+}
+// 即時：STR 記錄裡車子巡邏每圈本來就讀的點 (y=5 的 x1 x2 x5 x6、y=6 的 x3 x4)，沒有額外讀光達
+function parseLive(text) {
+  const m = /x1:(\d+) x2:(\d+) x5:(\d+) x6:(\d+)(?: c3:(\d+) c4:(\d+))?/.exec(text);
+  if (!m) return;
+  lidLive.rows[5] = [undefined, +m[1], +m[2], undefined, undefined, +m[3], +m[4], undefined];
+  if (m[5] !== undefined) lidLive.rows[6] = [undefined, undefined, undefined, +m[5], +m[6], undefined, undefined, undefined];
+  lidLive.time = stamp();
+  if (lidSel === "live") showLid(lidLive, "live");
+}
+// 起跑/遇牆/換道時車子原本就會記的 3 列 (y=4~6)：SCAN 記錄 "Y=4 [999,999,...,]"
+function parseScan(text) {
+  const m = /^Y=(\d) \[(.*)\]/.exec(text);
+  if (!m) return;
+  const vals = m[2].split(",").filter(v => v !== "").map(Number);
+  if (!scanCur) scanCur = { tag:"SCAN", rows:{}, time: stamp() };
+  scanCur.rows[+m[1]] = vals;
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => { const snap = scanCur; scanCur = null; if (snap) pushSnap(snap); }, 1500);
+}
+function refreshLidSelect() {
+  const box = $("lidHist"); box.textContent = "";
+  const live = document.createElement("option"); live.value = "live"; live.textContent = "即時（巡邏中已讀的點）"; box.appendChild(live);
+  for (let i = lidHist.length - 1; i >= 0; i--) {
+    const o = document.createElement("option"); o.value = String(i);
+    o.textContent = (i + 1) + ". " + (LID_LABEL[lidHist[i].tag] || lidHist[i].tag) + " " + lidHist[i].time;
+    box.appendChild(o);
+  }
+  box.value = lidSel;
+}
+function lidRowInfo(vals) {
+  const known = vals.filter(hasD), ok = known.filter(d => d > 0 && d < 999);
+  return { known: known.length, n: ok.length, min: ok.length ? Math.min.apply(null, ok) : 999, near: ok.filter(d => d <= 100).length };
+}
+function showLid(snap, kind) {
+  const ys = [0, 1, 2, 3, 4, 5, 6, 7]; if ($("lidFlip").checked) ys.reverse();
+  const grid = $("lidGrid"); grid.textContent = "";
+  const mk = (cls, txt) => { const e = document.createElement("div"); e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
+  grid.appendChild(mk("ax"));
+  for (let x = 0; x < 8; x++) grid.appendChild(mk("ax", "x" + x));
+  const wallRows = [], sum = [];
+  ys.forEach(y => {
+    const vals = snap.rows[y] || [];
+    grid.appendChild(mk("ax", "y" + y));
+    for (let x = 0; x < 8; x++) {
+      const d = vals[x], c = mk("c", !hasD(d) ? "·" : (d > 0 && d < 999 ? String(d) : "–"));
+      c.style.background = lidColor(d);
+      c.title = "x" + x + " y" + y + "：" + (!hasD(d) ? "這格沒有資料" : (d > 0 && d < 999 ? d + " cm" : "無效或超出範圍"));
+      grid.appendChild(c);
+    }
+    const a = lidRowInfo(vals);
+    sum.push(a.known === 0 ? "y" + y + "  （沒資料）" : "y" + y + "  有效 " + a.n + "/" + a.known + "  100cm內 " + a.near + "  最近 " + (a.min < 999 ? a.min + "cm" : "—"));
+    if (a.known >= 8 && a.near >= 4) wallRows.push("y" + y);
+  });
+  $("lidRows").textContent = sum.join("\n");
+  if (kind === "live") {
+    $("lidTag").textContent = "即時：巡邏中車子本來就在讀的 6 點" + (snap.time ? "　最後更新 " + snap.time : "　（等待小車回報）");
+    $("lidWall").textContent = "「·」是這格沒讀。要看整面牆的高度，請按「讀取光達」";
+  } else {
+    $("lidTag").textContent = (LID_LABEL[snap.tag] || snap.tag) + "　" + snap.time;
+    const full = Object.keys(snap.rows).length;
+    $("lidWall").textContent = full < 8 ? "這張只有 " + full + " 列資料，沒有判斷整面牆高度" : (wallRows.length ? "打到東西的列：" + wallRows.join("、") + "（共 " + wallRows.length + " 列）" : "100 cm 內沒有任何一列打到東西");
+  }
+}
+function showLidSel() {
+  if (lidSel === "live") showLid(lidLive, "live");
+  else { const s = lidHist[Number(lidSel)]; if (s) showLid(s); }
+}
+$("lidHist").addEventListener("change", () => { lidSel = $("lidHist").value; showLidSel(); });
+$("lidFlip").checked = store.get("lidFlip", false);
+$("lidFlip").addEventListener("change", () => { store.set("lidFlip", $("lidFlip").checked); showLidSel(); });
+$("lidAuto").addEventListener("change", () => send($("lidAuto").checked ? "LIDAR:AUTO1" : "LIDAR:AUTO0"));
+refreshLidSelect(); showLidSel();
 
 // ---------- 操作：長者按鈕 + 除錯指令 ----------
 $("stopBtn").addEventListener("click", () => { send("STOP"); if (demoMode) { curState = 0; endFound(); } });
