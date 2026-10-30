@@ -28,6 +28,8 @@
   .dot.on { background:var(--ok); box-shadow:0 0 12px var(--ok); }
   .mini { font-size:15px; background:var(--glass); border:1px solid var(--line); border-radius:999px; padding:8px 16px; }
   .mini:hover { border-color:var(--accent); }
+  .dbar input[type=range] { width:140px; accent-color:var(--accent); }
+  .dbar input[type=range]:disabled { opacity:.4; }
   .seg { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
   .seg button { border:none; background:transparent; padding:8px 18px; font-size:15px; }
   .seg button.on { background:rgba(90,168,255,.35); font-weight:700; }
@@ -105,6 +107,7 @@
   .dbar button { background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font-size:14px; }
   .dbar button:hover:not(:disabled) { border-color:var(--accent); }
   .dbar button:disabled { opacity:.4; cursor:default; }
+  .dbar button.lvl.on { background:rgba(90,168,255,.35); border-color:var(--accent); font-weight:700; }
   .dbar label { font-size:14px; color:var(--dim); cursor:pointer; }
   .dbar .lbl { font-size:13px; color:var(--dim); padding-right:4px; }
   .dbar input[type=number] { width:76px; background:var(--glass); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:14px; color:var(--fg); }
@@ -145,14 +148,74 @@
 
   #demo { position:fixed; right:10px; bottom:6px; font-size:12px; color:var(--dim); display:none; }
   #demo button { font-size:12px; padding:3px 8px; margin-left:4px; border-radius:6px; border:1px solid var(--line); background:var(--glass); }
+
+  /* ---------- 開場動畫：阿嬤的藥丸掉了，銀風幫忙找 ---------- */
+  #intro { position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:radial-gradient(1200px 800px at 50% 20%, #1b2a4a, #0a1226); }
+  #intro[hidden] { display:none; }
+  #intro .in-svg { width:min(94vw, 62vh * 1.333); }
+  #intro .in-svg svg { width:100%; height:auto; display:block; filter:drop-shadow(0 14px 30px rgba(0,0,0,.55)); }
+  #intro .in-sub { width:min(94vw, 1400px); min-height:2.6em; text-align:center; font-weight:800; font-size:clamp(24px, 5vh, 56px); line-height:1.35; color:#f1f5fb; text-shadow:0 2px 10px rgba(0,0,0,.7); }
+  #intro .in-who { display:inline-block; margin-right:.6em; padding:.04em .6em; border-radius:999px; font-size:.6em; vertical-align:.14em; color:#0b0f14; }
+  #intro .in-who.g { background:#ffd166; } #intro .in-who.r { background:#5aa8ff; }
+  #intro .in-nav { position:absolute; top:2vh; left:2vh; background:rgba(8,14,30,.6); }
+  #intro .in-close { position:absolute; top:2vh; right:2vh; } #intro .in-replay { position:absolute; bottom:2.4vh; right:2vh; }
+  #intro .in-hint { position:absolute; bottom:2.6vh; left:2vh; color:#7f8ea3; font-size:14px; }
+  #intro .in-start { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(8,14,30,.55); }
+  #intro .in-start[hidden] { display:none; }
+  #intro .in-btn { font-size:clamp(24px, 4.4vh, 44px); font-weight:800; padding:.5em 1.4em; border-radius:999px; border:3px solid #cfe3ff; background:linear-gradient(180deg,#3a7fd0,#2a5fa8); box-shadow:0 10px 30px rgba(42,95,168,.5); }
+  #intro .in-title { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:rgba(8,14,30,.72); opacity:0; pointer-events:none; transition:opacity .8s; }
+  #intro .in-title.show { opacity:1; pointer-events:auto; }
+  #intro .in-title h1 { margin:0; font-size:clamp(48px, 12vh, 128px); letter-spacing:.14em; color:#fff; text-shadow:0 4px 24px rgba(90,168,255,.7); }
+  #intro .in-title p { margin:0; font-size:clamp(18px, 3.2vh, 34px); color:#bcd0ee; letter-spacing:.1em; }
+  /* 角色動作：持續性的動作用 CSS，位移與掉落用 JS (Web Animations) */
+  #intro .gp-lean, #intro .gp-head, #intro .gp-arm, #intro .gp-mouth, #intro .rb-wheel, #intro .rb-bob, #intro .gp-q text, #intro #inSpark, #intro #inGlow { transform-box:fill-box; }
+  #intro .gp-lean { transform-origin:50% 100%; } #intro .gp-head { transform-origin:50% 100%; }
+  #intro .gp-arm-r { transform-origin:0% 0%; } #intro .gp-arm-l { transform-origin:100% 0%; }
+  #intro .gp-mouth { transform-origin:50% 50%; } #intro .rb-wheel, #intro #inSpark, #intro #inGlow { transform-origin:50% 50%; }
+  #intro .gp-q text { transform-origin:50% 100%; opacity:0; }
+  #intro[data-stage="enter"] .gp-body { animation:gpBob .3s ease-in-out infinite alternate; }
+  #intro[data-stage="lost"] .gp-body { animation:gpBob .5s ease-in-out infinite alternate; }
+  #intro[data-stage="lost"] .gp-head { animation:gpShake .55s ease-in-out infinite alternate; }
+  #intro[data-stage="lost"] .gp-arm-r { animation:gpScratch .35s ease-in-out infinite alternate; }
+  #intro[data-stage="lost"] .q1 { animation:gpQ 1.8s ease-out infinite; }
+  #intro[data-stage="lost"] .q2 { animation:gpQ 1.8s ease-out .6s infinite; }
+  #intro[data-stage="lost"] .q3 { animation:gpQ 1.8s ease-out 1.2s infinite; }
+  #intro[data-stage="shock"] .gp-head { animation:gpShake .12s linear infinite alternate; }
+  #intro[data-talk="g"] .gp-mouth { animation:gpTalk .22s ease-in-out infinite alternate; }
+  #intro[data-stage="found"] .gp-mouth, #intro[data-stage="title"] .gp-mouth { animation:gpSmile 1s ease-in-out infinite alternate; }
+  #intro .rb-wheel { animation:inSpin .5s linear infinite; animation-play-state:paused; }
+  #intro[data-stage="robot"] .rb-wheel, #intro[data-stage="found"] .rb-wheel { animation-play-state:running; }
+  #intro[data-stage="robot"] .rb-bob { animation:gpBob .22s ease-in-out infinite alternate; }
+  @keyframes gpBob { from { transform:translateY(0); } to { transform:translateY(-4px); } }
+  @keyframes gpShake { from { transform:rotate(-8deg); } to { transform:rotate(8deg); } }
+  @keyframes gpScratch { from { transform:rotate(-150deg); } to { transform:rotate(-132deg); } }
+  @keyframes gpQ { 0% { opacity:0; transform:translateY(8px) scale(.5); } 20% { opacity:1; transform:none; } 80% { opacity:1; } 100% { opacity:0; transform:translateY(-10px) scale(1.15); } }
+  @keyframes gpTalk { from { transform:scaleY(.5) scaleX(.8); } to { transform:scaleY(2.2) scaleX(1.1); } }
+  @keyframes gpSmile { from { transform:scaleY(1.2) scaleX(1.2); } to { transform:scaleY(2) scaleX(1.5); } }
+  @keyframes inSpin { to { transform:rotate(360deg); } }
 </style>
 </head>
 <body class="elder">
+<!-- 開場動畫 (阿嬤的藥丸掉了，銀風幫忙找)：點「開場動畫」或用 #elder 開啟時自動出現 -->
+<div id="intro" hidden>
+  <div class="in-svg" id="inSvg"></div>
+  <div class="in-sub" id="inSub"></div>
+  <div class="in-title" id="inTitle">
+    <h1>銀風巡弋</h1>
+    <p>守護長者居家安全的 AI 失物巡檢小車</p>
+    <button class="mini" id="inEnter" style="margin-top:2vh; font-size:20px; padding:10px 28px;">進入系統</button>
+  </div>
+  <div class="in-start" id="inStart"><button class="in-btn" id="inGo">▶ 點一下開始</button></div>
+  <div class="seg nav in-nav"><button data-go="intro">開場</button><button data-go="elder">長輩頁</button><button data-go="debug">工程頁</button></div>
+  <button class="mini in-close" id="inClose">略過 ✕</button>
+  <button class="mini in-replay" id="inReplay" hidden>重播</button>
+  <div class="in-hint">Esc 關閉　｜　語音使用瀏覽器內建的台灣國語</div>
+</div>
 <div id="app">
   <div class="top">
     <div class="logo">銀風巡弋<small>守護長者居家安全的 AI 失物巡檢小車</small></div>
     <div class="grow"></div>
-    <div class="seg"><button id="modeElder" class="on">提示機</button><button id="modeDebug">除錯台</button></div>
+    <div class="seg nav"><button data-go="intro">開場</button><button data-go="elder" id="modeElder">長輩頁</button><button data-go="debug" id="modeDebug">工程頁</button></div>
     <button class="mini" id="soundBtn">測試聲音</button>
     <button class="mini" id="fsBtn">全螢幕</button>
     <div class="chip"><span class="dot" id="dot"></span><span id="connText">未連線</span></div>
@@ -206,11 +269,18 @@
       <button data-cmd="GO" disabled>GO 開始／繼續</button>
       <button data-cmd="STOP" disabled>STOP 停止</button>
       <button data-cmd="ST?" disabled>查狀態</button>
+      <span class="lbl">記錄量</span>
+      <button class="lvl" data-cmd="LOG:0" disabled title="安靜：只留開始、完工、辨識、每道修正次數">安靜</button>
+      <button class="lvl" data-cmd="LOG:1" disabled title="一般：再加換道、偏角修正，走道狀態約 2.5 秒一行">一般</button>
+      <button class="lvl" data-cmd="LOG:2" disabled title="除錯：全開，含燈光、3 列光達掃描、走道狀態約 0.85 秒一行">除錯</button>
+      <span class="lbl">前進速度</span>
+      <input type="range" id="spd" min="30" max="150" step="5" value="45" disabled title="小車前進速度 (30~150)，預設 45；每條航道全程同一速度。放開滑桿才送出">
+      <b id="spdVal">45</b>
       <span class="grow"></span>
       <label><input type="checkbox" id="showTime" checked> 時間</label>
       <label><input type="checkbox" id="autoScroll" checked> 自動捲動</label>
       <button id="clearBtn">清除</button>
-      <button id="saveBtn">下載記錄</button>
+      <button id="saveBtn">下載記錄</button><button id="copyBtn">複製記錄</button>
     </div>
     <div class="dbar" id="lensBar">
       <span class="lbl">lens 工具</span>
@@ -282,12 +352,28 @@ function setMode(m) {
   document.body.classList.toggle("elder", m === "elder");
   $("elder").style.display = m === "elder" ? "flex" : "none";
   $("debug").classList.toggle("show", m === "debug");
-  $("modeElder").classList.toggle("on", m === "elder");
-  $("modeDebug").classList.toggle("on", m === "debug");
+  markNav();
   if (m === "debug") $("log").scrollTop = $("log").scrollHeight;
+  if (!location.hash.startsWith("#demo") && location.hash !== "#intro") history.replaceState(null, "", "#" + m);   // 網址永遠對應目前頁面
 }
-$("modeElder").addEventListener("click", () => setMode("elder"));
-$("modeDebug").addEventListener("click", () => setMode("debug"));
+// 網址 hash 就是頁面：#intro 開場動畫、#elder 提示機、#debug 除錯台 (沒有 hash 等於 #intro)
+function route() {
+  const h = location.hash;
+  if (h.startsWith("#demo")) return;
+  if (h === "#debug") { closeIntro(); setMode("debug"); }
+  else if (h === "#elder") { closeIntro(); setMode("elder"); }
+  else { setMode("elder"); openIntro(); history.replaceState(null, "", "#intro"); }
+}
+window.addEventListener("hashchange", route);
+document.querySelectorAll(".nav [data-go]").forEach(b => b.addEventListener("click", () => {
+  const h = "#" + b.dataset.go;
+  if (location.hash === h) route(); else location.hash = h;
+}));
+function markNav() {                              // 三顆切換鈕：亮的是目前所在頁
+  const cur = !$("intro").hidden ? "intro" : mode;
+  document.querySelectorAll(".nav [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === cur));
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && mode === "elder") location.hash = "#debug"; });   // Esc 回除錯台
 
 // ---------- 提示機畫面 ----------
 let curState = 0, lane = 0, expected = 6, foundSet = [];
@@ -365,12 +451,14 @@ function beep() {
   } catch {}
 }
 function showFound(name, quiet) {
+  closeIntro();
   if (!foundSet.includes(name)) foundSet.push(name);
   const it = ITEMS[name];
   $("fTw").innerHTML = '<span class="spk"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3z"/></svg><s></s><s></s><s></s></span>';
   $("fList").textContent = foundSet.length > 1 ? "目前找到：" + foundSet.map(n => ITEMS[n].name).join("、") : "";
   setPicture(name);
   setMode("elder");                                // 找到失物時，一律切回提示機畫面
+  $("modeElder").parentElement.style.display = "";
   showView("found");
   if (!quiet) { beep(); setTimeout(() => playTaiwanese(name), 500); }
 }
@@ -381,6 +469,188 @@ function endFound() {
   $("found").classList.remove("show");
   renderPatrol();
 }
+
+// ---------- 開場動畫：阿嬤的藥丸掉了，銀風幫忙找 ----------
+// 場景是 SVG 卡通；持續性動作 (走路晃動、搖頭、問號、輪子) 用 CSS，位移與掉落用 Web Animations；
+// 語音直接用瀏覽器內建的線上台灣國語 (Edge 有「曉臻、曉雨、雲哲」自然語音，Android Chrome 用 Google 語音)，不用 mp3
+const INTRO = { token:0 };
+let zhVoices = [];
+function loadVoices() { zhVoices = window.speechSynthesis ? speechSynthesis.getVoices().filter(v => /^zh|^cmn/i.test(v.lang)) : []; }
+if (window.speechSynthesis) { loadVoices(); speechSynthesis.addEventListener("voiceschanged", loadVoices); }
+function pickZhVoice(male) {
+  const tw = zhVoices.filter(v => /zh[-_]TW|cmn[-_]TW/i.test(v.lang));
+  const pool = tw.length ? tw : zhVoices;
+  const natural = /Natural|Online/i, want = male ? /YunJhe|Zhiwei|雲|男|Male/i : /HsiaoChen|HsiaoYu|Hanhan|Yating|曉|女|Female/i;
+  return pool.find(v => want.test(v.name) && natural.test(v.name)) || pool.find(v => want.test(v.name)) || pool.find(v => natural.test(v.name)) || pool[0] || null;
+}
+function speakZh(text, o = {}) {                       // 回傳 Promise：唸完才 resolve；唸不出來也會在估計時間後 resolve，動畫不會卡住
+  return new Promise(res => {
+    if (!window.speechSynthesis) return setTimeout(res, text.length * 300 + 600);
+    try { speechSynthesis.cancel(); } catch {}
+    const u = new SpeechSynthesisUtterance(text); u.lang = "zh-TW"; u.rate = o.rate || .9; u.pitch = o.pitch || 1;
+    const v = pickZhVoice(o.male); if (v) u.voice = v;
+    let done = false; const fin = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+    const t = setTimeout(fin, text.length * 450 + 2500);
+    u.onend = fin; u.onerror = fin;
+    speechSynthesis.speak(u);
+  });
+}
+function tink(f) {                                     // 藥丸落地的「叮」聲，用 Web Audio 合成
+  try {
+    chime = chime || new (window.AudioContext || window.webkitAudioContext)();
+    if (chime.state === "suspended") chime.resume();
+    const o = chime.createOscillator(), g = chime.createGain(), t = chime.currentTime;
+    o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(chime.destination);
+    g.gain.setValueAtTime(.3, t); g.gain.exponentialRampToValueAtTime(.001, t + .25);
+    o.start(t); o.stop(t + .26);
+  } catch {}
+}
+function introSVG() {
+  const stars = [[48, 46], [70, 40], [96, 62], [56, 80], [106, 90]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.4" fill="#fff" opacity=".85"/>`).join("");
+  const bottle = `<g transform="scale(1.5) rotate(-35)"><rect x="-10" y="-4.5" width="20" height="9" rx="4.5" fill="#fff" stroke="#c9d3e0" stroke-width=".8"/><path d="M0 -4.5H5.5A4.5 4.5 0 0 1 5.5 4.5H0Z" fill="#e8453b"/><path d="M-7 -2.2H-2" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".8"/></g>`;
+  return `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="阿嬤的藥丸掉了，銀風幫忙找">
+  <defs>
+    <linearGradient id="inWall" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#3b4a6e"/><stop offset="1" stop-color="#27334f"/></linearGradient>
+    <linearGradient id="inFloor" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#6e5340"/><stop offset="1" stop-color="#47342a"/></linearGradient>
+    <linearGradient id="inBeamG" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#8fd3ff" stop-opacity=".8"/><stop offset="1" stop-color="#8fd3ff" stop-opacity=".08"/></linearGradient>
+    <clipPath id="inClip"><rect x="2" y="2" width="396" height="296" rx="20"/></clipPath>
+  </defs>
+  <g clip-path="url(#inClip)">
+    <rect width="400" height="216" fill="url(#inWall)"/>
+    <rect x="30" y="28" width="92" height="84" rx="4" fill="#16233f" stroke="#9fb2d1" stroke-width="4"/><path d="M76 28V112M30 70H122" stroke="#9fb2d1" stroke-width="3"/>
+    <circle cx="100" cy="46" r="9" fill="#f6edc3"/><circle cx="104" cy="43" r="8" fill="#16233f"/>${stars}
+    <rect x="150" y="38" width="64" height="46" rx="3" fill="#caa56a" stroke="#8a6a38" stroke-width="3"/><rect x="156" y="44" width="52" height="34" fill="#7fa9d6"/><path d="M156 78 L172 60 L184 70 L194 56 L208 78Z" fill="#4f7a58"/>
+    <rect y="216" width="400" height="84" fill="url(#inFloor)"/><rect y="214" width="400" height="5" fill="#2a1f19"/>
+    <ellipse cx="190" cy="274" rx="140" ry="20" fill="#7a3b46" opacity=".5"/>
+    <ellipse cx="318" cy="256" rx="58" ry="8" fill="#150e09" opacity=".6"/>
+    <g id="inGlow" opacity="0"><circle cx="318" cy="251" r="26" fill="#fff6b0"/></g>
+    <g id="bDrop" opacity="0">${bottle}</g>
+    <g id="inSofa">
+      <rect x="262" y="118" width="128" height="76" rx="16" fill="#8c4f58"/>
+      <rect x="250" y="168" width="148" height="74" rx="12" fill="#a8656f"/>
+      <rect x="242" y="150" width="26" height="92" rx="12" fill="#8c4f58"/><rect x="382" y="150" width="26" height="92" rx="12" fill="#8c4f58"/>
+      <path d="M324 172V240" stroke="#8c4f58" stroke-width="3"/>
+      <rect x="258" y="240" width="9" height="22" rx="2" fill="#4a2f26"/><rect x="380" y="240" width="9" height="22" rx="2" fill="#4a2f26"/>
+    </g>
+    <rect id="sofaDark" x="270" y="242" width="108" height="22" fill="#0c0705" opacity=".82"/>
+    <g transform="translate(0 262)"><g id="gpa" style="transform:translateX(-90px)">
+      <ellipse cx="0" cy="2" rx="26" ry="5" fill="#000" opacity=".25"/>
+      <g class="gp-lean">
+        <rect x="-12" y="-42" width="8" height="38" rx="3" fill="#e6cdb8"/><rect x="4" y="-42" width="8" height="38" rx="3" fill="#e6cdb8"/>
+        <ellipse cx="-10" cy="-2" rx="11" ry="5" fill="#2a2018"/><ellipse cx="10" cy="-2" rx="11" ry="5" fill="#2a2018"/>
+        <g class="gp-body">
+          <path d="M-22 -60 L-31 -38 Q0 -30 31 -38 L22 -60Z" fill="#b0679a"/><rect x="-23" y="-110" width="46" height="64" rx="15" fill="#b0679a"/>
+          <path d="M-9 -110 Q0 -98 9 -110Z" fill="#f4efe6"/><circle cx="0" cy="-96" r="3.5" fill="#ffd166" stroke="#a87c1b" stroke-width="1"/><path d="M-23 -58H23" stroke="#8d4f7a" stroke-width="3"/>
+          <g class="gp-arm gp-arm-l"><line x1="-20" y1="-100" x2="-34" y2="-70" stroke="#b0679a" stroke-width="10" stroke-linecap="round"/><circle cx="-35" cy="-67" r="5.5" fill="#f2c9a0"/></g>
+          <g class="gp-arm gp-arm-r"><line x1="20" y1="-100" x2="36" y2="-72" stroke="#b0679a" stroke-width="10" stroke-linecap="round"/><circle cx="37" cy="-69" r="5.5" fill="#f2c9a0"/><g id="gpBottle" transform="translate(38 -76)">${bottle}</g></g>
+          <g class="gp-head">
+            <circle cx="0" cy="-153" r="9.5" fill="#f4f4f4" stroke="#d6d6d6" stroke-width="1.2"/>
+            <circle cx="0" cy="-129" r="21" fill="#f2c9a0"/>
+            <ellipse cx="-21" cy="-127" rx="4" ry="6" fill="#e9b88c"/><ellipse cx="21" cy="-127" rx="4" ry="6" fill="#e9b88c"/>
+            <path d="M-21 -134 C-24 -162 24 -162 21 -134 C15 -149 -15 -149 -21 -134Z" fill="#f4f4f4"/>
+            <ellipse cx="-22" cy="-131" rx="4" ry="8" fill="#f4f4f4"/><ellipse cx="22" cy="-131" rx="4" ry="8" fill="#f4f4f4"/>
+            <path d="M-14 -140 Q-8 -143 -3 -140M3 -140 Q8 -143 14 -140" stroke="#cfc7bd" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+            <circle cx="-8" cy="-130" r="6.5" fill="rgba(255,255,255,.25)" stroke="#3a2a22" stroke-width="1.6"/><circle cx="8" cy="-130" r="6.5" fill="rgba(255,255,255,.25)" stroke="#3a2a22" stroke-width="1.6"/><path d="M-1.5 -130H1.5" stroke="#3a2a22" stroke-width="1.6"/>
+            <circle cx="-8" cy="-130" r="1.9" fill="#3a2a22"/><circle cx="8" cy="-130" r="1.9" fill="#3a2a22"/>
+            <path d="M0 -127 q-2 5 1 6" stroke="#c9976f" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <circle cx="-13" cy="-120" r="3.4" fill="#f0a08a" opacity=".5"/><circle cx="13" cy="-120" r="3.4" fill="#f0a08a" opacity=".5"/>
+            <ellipse class="gp-mouth" cx="0" cy="-114" rx="5.5" ry="2" fill="#a8453a"/>
+          </g>
+        </g>
+      </g>
+      <g class="gp-q" font-weight="900" font-size="24" fill="#ffd23f" stroke="#2a2018" stroke-width="2.4" paint-order="stroke" font-family="sans-serif" text-anchor="middle">
+        <text class="q1" x="-30" y="-168">？</text><text class="q2" x="6" y="-184">？</text><text class="q3" x="38" y="-166">？</text>
+      </g>
+    </g></g>
+    <g transform="translate(0 262)"><g id="rb" style="transform:translateX(-150px)">
+      <ellipse cx="0" cy="2" rx="40" ry="5" fill="#000" opacity=".25"/>
+      <g class="rb-bob">
+        <rect x="-44" y="-50" width="88" height="36" rx="12" fill="#4a90d9" stroke="#cfe3ff" stroke-width="3"/>
+        <rect x="-8" y="-72" width="16" height="22" fill="#2a6aa8"/><circle cx="0" cy="-76" r="10" fill="#ffd166" stroke="#a87c1b" stroke-width="2"/>
+        <circle cx="-16" cy="-34" r="6" fill="#fff"/><circle cx="16" cy="-34" r="6" fill="#fff"/><circle cx="-14" cy="-34" r="2.6" fill="#223"/><circle cx="18" cy="-34" r="2.6" fill="#223"/>
+        <path d="M-10 -22 Q0 -16 10 -22" stroke="#cfe3ff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <g class="rb-wheel"><circle cx="-26" cy="-8" r="11" fill="#222" stroke="#cfe3ff" stroke-width="2"/><path d="M-26 -17V1M-35 -8H-17" stroke="#8a97a8" stroke-width="2"/></g>
+        <g class="rb-wheel"><circle cx="26" cy="-8" r="11" fill="#222" stroke="#cfe3ff" stroke-width="2"/><path d="M26 -17V1M17 -8H35" stroke="#8a97a8" stroke-width="2"/></g>
+      </g>
+    </g></g>
+    <g transform="translate(70 186)"><g id="inBeam" opacity="0" style="transform-origin:0 0;"><polygon points="0,0 262,-26 262,26" fill="url(#inBeamG)"/></g></g>
+    <g id="inSpark" opacity="0" transform="translate(318 246)"><path d="M0 -17 L4.5 -4.5 L17 0 L4.5 4.5 L0 17 L-4.5 4.5 L-17 0 L-4.5 -4.5Z" fill="#fff6b0" stroke="#ffd23f" stroke-width="1.5"/></g>
+  </g>
+  <rect x="2" y="2" width="396" height="296" rx="20" fill="none" stroke="#3a4a66" stroke-width="3"/>
+</svg>`;
+}
+const inQ = s => $("intro").querySelector(s);
+function inAnim(el, kf, ms, opt) { const a = el.animate(kf, Object.assign({ duration:ms, fill:"forwards", easing:"ease-in-out" }, opt || {})); return a.finished.catch(() => {}); }
+async function inSay(who, cls, text, v) {
+  $("intro").dataset.talk = cls;
+  $("inSub").innerHTML = `<span class="in-who ${cls}">${who}</span>${text}`;
+  await speakZh(text, v);
+  $("intro").dataset.talk = "";
+  await new Promise(r => setTimeout(r, 450));
+}
+async function introPlay() {
+  const my = ++INTRO.token, ok = () => my === INTRO.token, I = $("intro");
+  const wait = ms => new Promise(r => setTimeout(r, ms)), set = s => { I.dataset.stage = s; };
+  I.getAnimations({ subtree:true }).forEach(a => a.cancel());
+  try { speechSynthesis.cancel(); } catch {}
+  $("inSvg").innerHTML = introSVG();
+  $("inTitle").classList.remove("show"); $("inSub").innerHTML = ""; $("inStart").hidden = true; $("inReplay").hidden = true; I.dataset.talk = "";
+  const gpa = inQ("#gpa"), rb = inQ("#rb"), bd = inQ("#bDrop");
+  set("enter"); await wait(400); if (!ok()) return;
+  await inAnim(gpa, [{ transform:"translateX(-90px)" }, { transform:"translateX(112px)" }], 2400, { easing:"linear" }); if (!ok()) return;
+  set("hold"); await wait(900); if (!ok()) return;
+  await inAnim(inQ(".gp-arm-r"), [{ transform:"rotate(0deg)" }, { transform:"rotate(-34deg)" }, { transform:"rotate(10deg)" }], 460); if (!ok()) return;   // 手一滑
+  inQ("#gpBottle").style.opacity = 0; bd.style.opacity = 1;
+  const bx = 112 + 38, by = 262 - 76;
+  set("drop"); tink(1500);
+  await inAnim(bd, [{ transform:`translate(${bx}px,${by}px) rotate(0deg)` }, { transform:`translate(${bx + 6}px,249px) rotate(140deg)`, offset:.6 }, { transform:`translate(${bx + 14}px,238px) rotate(200deg)`, offset:.78 }, { transform:`translate(${bx + 22}px,250px) rotate(250deg)` }], 900, { easing:"ease-in" }); if (!ok()) return;
+  tink(1100);
+  await inAnim(bd, [{ transform:`translate(${bx + 22}px,250px) rotate(250deg)` }, { transform:"translate(318px,252px) rotate(810deg)" }], 1700, { easing:"cubic-bezier(.2,.7,.3,1)" }); if (!ok()) return;
+  set("shock"); await wait(700); if (!ok()) return;
+  set("lost");                                          // 阿嬤彎腰、搖頭、抓頭，頭上冒問號，說出那句話
+  inAnim(gpa, [{ transform:"translateX(112px)" }, { transform:"translateX(176px)" }], 1800);
+  inAnim(inQ(".gp-lean"), [{ transform:"rotate(0deg)" }, { transform:"rotate(13deg)" }], 1800);
+  await inSay("阿嬤", "g", "哎呀！掉了，怎麼找不到了？", { male:false, rate:.8, pitch:.8 }); if (!ok()) return;
+  await wait(500); if (!ok()) return;
+  set("robot");                                         // 銀風開進來，掃描光束照向沙發底下
+  await inAnim(rb, [{ transform:"translateX(-150px)" }, { transform:"translateX(70px)" }], 2200, { easing:"ease-out" }); if (!ok()) return;
+  inAnim(inQ("#inBeam"), [{ opacity:0 }, { opacity:1 }], 500);
+  inAnim(inQ("#inBeam"), [{ transform:"rotate(-8deg)" }, { transform:"rotate(24deg)" }, { transform:"rotate(15deg)" }], 3200);
+  await inSay("銀風", "r", "阿嬤別擔心，交給銀風巡弋！", { male:false, rate:1.05, pitch:1.35 }); if (!ok()) return;
+  set("found");                                         // 沙發底下亮起來，藥丸找到了
+  inAnim(inQ("#sofaDark"), [{ opacity:.82 }, { opacity:0 }], 900);
+  inAnim(inQ("#inGlow"), [{ opacity:0, transform:"scale(.4)" }, { opacity:.8, transform:"scale(1.2)" }, { opacity:.35, transform:"scale(1)" }], 1200);
+  inAnim(inQ("#inSpark"), [{ opacity:0, transform:"translate(318px,246px) scale(.2) rotate(0deg)" }, { opacity:1, transform:"translate(318px,246px) scale(1.2) rotate(90deg)" }, { opacity:0, transform:"translate(318px,246px) scale(.6) rotate(180deg)" }], 1400);
+  inAnim(inQ(".gp-lean"), [{ transform:"rotate(13deg)" }, { transform:"rotate(0deg)" }], 700);
+  inAnim(inQ(".gp-arm-l"), [{ transform:"rotate(0deg)" }, { transform:"rotate(34deg)" }], 600);
+  inAnim(inQ(".gp-arm-r"), [{ transform:"rotate(10deg)" }, { transform:"rotate(-34deg)" }], 600);
+  tink(1760);
+  await inSay("銀風", "r", "找到囉！藥丸在沙發底下！", { male:false, rate:1.05, pitch:1.35 }); if (!ok()) return;
+  await inSay("阿嬤", "g", "哎呀，真好，謝謝你！", { male:false, rate:.8, pitch:.8 }); if (!ok()) return;
+  set("title"); $("inSub").innerHTML = ""; $("inTitle").classList.add("show"); $("inReplay").hidden = false;
+}
+function openIntro() {
+  ++INTRO.token; const I = $("intro");
+  I.hidden = false; markNav(); I.dataset.stage = "splash"; $("inSvg").innerHTML = introSVG(); $("inSub").innerHTML = "";
+  $("inTitle").classList.remove("show"); $("inStart").hidden = false; $("inReplay").hidden = true;
+}
+function closeIntro() {
+  if ($("intro").hidden) return;
+  ++INTRO.token; try { speechSynthesis.cancel(); } catch {}
+  $("intro").hidden = true; markNav();
+  if (location.hash === "#intro") history.replaceState(null, "", "#" + mode);
+  }
+$("inGo").addEventListener("click", () => { unlockAudio(); introPlay(); });
+$("inReplay").addEventListener("click", introPlay);
+$("inClose").addEventListener("click", () => { enterSystem(); });
+$("inEnter").addEventListener("click", enterSystem);
+document.addEventListener("keydown", e => {            // 開場動畫開著時：Esc 關閉；空白鍵不要誤送 GO / STOP
+  if ($("intro").hidden) return;
+  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); enterSystem(); }
+  else if (e.code === "Space") { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+
+function enterSystem() { location.hash = "#debug"; }   // 動畫結束 / 略過：進除錯台 (V7.3 原本的頁面)
 
 // ---------- 除錯台：記錄 ----------
 const logEl = $("log"), records = [], hiddenTags = new Set(), knownTags = new Set();
@@ -420,6 +690,20 @@ $("saveBtn").addEventListener("click", () => {
   a.href = URL.createObjectURL(blob);
   a.download = `silverwind_log_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.txt`;
   a.click(); URL.revokeObjectURL(a.href);
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  const text = records.join("\n"), b = $("copyBtn"), old = "複製記錄";
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch (e2) {}
+    ta.remove();
+  }
+  b.textContent = ok ? "已複製 " + records.length + " 行" : "複製失敗";
+  setTimeout(() => b.textContent = old, 2000);
 });
 
 // ---------- lens 狀態：從 SYS 記錄解析 (Ready / Lens handshake / Lens model / Serial swapped / Scan model) ----------
@@ -464,6 +748,8 @@ function handleLine(line) {
   } else if (line.startsWith("ST=")) {
     const p = line.slice(3).split(",").map(Number);
     curState = p[0]; lane = p[1] || 0; expected = p[2] || 6;
+    if (p.length > 3 && p[3] >= 0 && p[3] <= 2) showLogLevel(p[3]);
+    if (p.length > 4 && p[4] >= 30 && p[4] <= 150 && document.activeElement !== $("spd")) showSpeed(p[4]);
     if (curState !== 3) renderPatrol();
     addLine("sys", "狀態 " + (STATE_NAMES[curState] ?? curState) + "，航道 " + lane + "/" + expected);
   } else {
@@ -503,9 +789,10 @@ async function keepAwake(on) {
 }
 function setConnected(on) {
   connected = on;
+  if (on) closeIntro();                            // 連上小車就收起開場動畫
   $("dot").classList.toggle("on", on);
   $("connText").textContent = on ? "小車已連線" : "未連線";
-  document.querySelectorAll("#debug [data-cmd], #sendBtn, #input").forEach(el => el.disabled = !on);
+  document.querySelectorAll("#debug [data-cmd], #sendBtn, #input, #spd").forEach(el => el.disabled = !on);
   $("dConnect").disabled = on;
   $("dDisc").disabled = !on;
   $("modelId").disabled = !on; $("modelBtn").disabled = !on; $("lidAuto").disabled = !on;
@@ -587,6 +874,8 @@ async function connect(dev, auto) {
     addLine("sys", (auto ? "自動連線：" : "已連線：") + device.name);
     send("ST?", true);
     send($("lidAuto").checked ? "LIDAR:AUTO1" : "LIDAR:AUTO0", true);
+    send("LOG:" + logLevel, true);
+    send("SPD:" + cruiseSpeed, true);
   } catch (e) {
     setConnected(false);
     $("connText").textContent = "連線失敗，請再試一次";
@@ -713,11 +1002,32 @@ $("lidFlip").checked = store.get("lidFlip", false);
 $("lidFlip").addEventListener("change", () => { store.set("lidFlip", $("lidFlip").checked); showLidSel(); });
 $("lidAuto").addEventListener("change", () => send($("lidAuto").checked ? "LIDAR:AUTO1" : "LIDAR:AUTO0"));
 refreshLidSelect(); showLidSel();
+// 記錄量 (LOG:0/1/2)：點按鈕時記住，連線後自動送給小車；亮起的按鈕以小車回報的 ST= 第 4 欄為準
+let logLevel = store.get("logLevel", 1);
+function showLogLevel(n) { document.querySelectorAll('[data-cmd^="LOG:"]').forEach(b => b.classList.toggle("on", b.dataset.cmd === "LOG:" + n)); }
+document.querySelectorAll('[data-cmd^="LOG:"]').forEach(b => b.addEventListener("click", () => { logLevel = +b.dataset.cmd.slice(4); store.set("logLevel", logLevel); showLogLevel(logLevel); }));
+showLogLevel(logLevel);
+// 前進速度 (SPD:n)：放開滑桿才送出並記住，連線後自動送給小車；亮的數字以小車回報的 ST= 第 5 欄為準
+let cruiseSpeed = Math.min(150, Math.max(30, store.get("speed", 45)));
+function showSpeed(n) { $("spd").value = n; $("spdVal").textContent = n; }
+$("spd").addEventListener("input", () => { $("spdVal").textContent = $("spd").value; });
+$("spd").addEventListener("change", () => { cruiseSpeed = +$("spd").value; store.set("speed", cruiseSpeed); send("SPD:" + cruiseSpeed); });
+showSpeed(cruiseSpeed);
 
 // ---------- 操作：長者按鈕 + 除錯指令 ----------
 $("stopBtn").addEventListener("click", () => { send("STOP"); if (demoMode) { curState = 0; endFound(); } });
 $("goBtn").addEventListener("click", () => { send("GO"); if (demoMode) { curState = 1; endFound(); } });
 document.querySelectorAll("#debug [data-cmd]").forEach(b => b.addEventListener("click", () => send(b.dataset.cmd)));
+// 空白鍵：待機/完工/尋獲 → GO（開始/繼續）；巡航中 → STOP。輸入框、下拉選單內不觸發
+document.addEventListener("keydown", e => {
+  if (e.code !== "Space" || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, tag = t && t.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (curState === 0 || curState === 3 || curState === 5) $("goBtn").click(); else $("stopBtn").click();
+});
 function submitInput() { const v = $("input").value.trim(); if (v) { send(v); $("input").value = ""; } }
 $("sendBtn").addEventListener("click", submitInput);
 $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); submitInput(); } });
@@ -745,8 +1055,7 @@ if (demoMode) {
 } else {
   renderLanes();
   // 目前只用除錯台：預設直接進除錯台並隱藏模式切換鈕；網址加 #elder 才顯示提示機與切換鈕
-  if (location.hash === "#elder") setMode("elder");
-  else { $("modeElder").parentElement.style.display = "none"; setMode("debug"); }
+  route();         // 依網址 hash 進入：#intro (預設) / #elder / #debug；開場動畫要點一下才有聲音
   autoConnect();   // 開網頁時自動連上已記住的 micro:bit；第一次要先按「連線小車」選一次
 }
 // 離線可用 (PWA)：只有從網站 (http/https) 開啟時才註冊；直接開本機檔案 (file://) 不註冊
